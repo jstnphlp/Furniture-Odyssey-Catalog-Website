@@ -1,5 +1,8 @@
 import { useState, useMemo } from "react";
+import { createClient } from "../lib/client";
 import { useAdminStore } from "../stores/useAdminStore";
+
+const supabase = createClient();
 import { useCatalogStore } from "../stores/useCatalogStore";
 import { isCustomizableTable } from "../types/catalog";
 import type { Product, CustomizableTable } from "../types/catalog";
@@ -19,13 +22,22 @@ export function AdminPage() {
   );
 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [newProductState, setNewProductState] = useState<{
     name: string;
     description: string;
     dimensions: string;
     basePrice: string;
     category: "Chairs" | "Tables" | "Collections";
-  }>({ name: "", description: "", dimensions: "", basePrice: "", category: "Chairs" });
+    imageFile: File | null;
+  }>({
+    name: "",
+    description: "",
+    dimensions: "",
+    basePrice: "",
+    category: "Chairs",
+    imageFile: null,
+  });
 
   const [activeTab, setActiveTab] = useState<Tab>("prices");
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
@@ -71,22 +83,56 @@ export function AdminPage() {
     setEditingProduct(null);
   };
 
-  const handleAddProduct = () => {
-    if (!newProductState.name) return;
-    const newId = `prod-${Date.now()}`;
-    addProduct({
-      id: newId,
-      name: newProductState.name,
-      description: newProductState.description,
-      dimensions: newProductState.dimensions,
-      basePrice: Number(newProductState.basePrice) || 0,
-      category: newProductState.category,
-      image: "/images/hero-chair.png", // fallback placeholder
-      isCustomizable: false,
-    });
-    setNewProductState({ name: "", description: "", dimensions: "", basePrice: "", category: "Chairs" });
-    setIsAddingProduct(false);
-    flash(newId);
+  const handleAddProduct = async () => {
+    if (!newProductState.name || !newProductState.imageFile) {
+      alert("Please provide both a name and an image file.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = newProductState.imageFile.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(filePath, newProductState.imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(filePath);
+
+      const newId = `prod-${Date.now()}`;
+      addProduct({
+        id: newId,
+        name: newProductState.name,
+        description: newProductState.description,
+        dimensions: newProductState.dimensions,
+        basePrice: Number(newProductState.basePrice) || 0,
+        category: newProductState.category,
+        image: publicUrlData.publicUrl,
+        isCustomizable: false,
+        isHomepageFeatured: false,
+      });
+
+      setNewProductState({
+        name: "",
+        description: "",
+        dimensions: "",
+        basePrice: "",
+        category: "Chairs",
+        imageFile: null,
+      });
+      setIsAddingProduct(false);
+      flash(newId);
+    } catch (err: any) {
+      alert("Error adding product: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
@@ -341,22 +387,35 @@ export function AdminPage() {
 
           {isAddingProduct && (
             <div className="rounded-xl border border-green-300 bg-green-50/50 p-5 space-y-3">
-              <h3 className="font-display text-[20px] text-green-800">Add New Product</h3>
+              <h3 className="font-display text-[20px] text-green-800">
+                Add New Product
+              </h3>
               <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">Name</label>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Name
+                </label>
                 <input
                   type="text"
                   value={newProductState.name}
-                  onChange={(e) => setNewProductState(s => ({ ...s, name: e.target.value }))}
+                  onChange={(e) =>
+                    setNewProductState((s) => ({ ...s, name: e.target.value }))
+                  }
                   className="w-full rounded-lg border bg-white px-3 py-2 text-[14px] outline-none"
                   placeholder="e.g. Modern Sofa"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">Category</label>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Category
+                </label>
                 <select
                   value={newProductState.category}
-                  onChange={(e) => setNewProductState(s => ({ ...s, category: e.target.value as any }))}
+                  onChange={(e) =>
+                    setNewProductState((s) => ({
+                      ...s,
+                      category: e.target.value as any,
+                    }))
+                  }
                   className="w-full rounded-lg border bg-white px-3 py-2 text-[14px] outline-none"
                 >
                   <option value="Chairs">Chairs</option>
@@ -365,39 +424,85 @@ export function AdminPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">Description</label>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Description
+                </label>
                 <textarea
                   value={newProductState.description}
-                  onChange={(e) => setNewProductState(s => ({ ...s, description: e.target.value }))}
+                  onChange={(e) =>
+                    setNewProductState((s) => ({
+                      ...s,
+                      description: e.target.value,
+                    }))
+                  }
                   rows={2}
                   className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none resize-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">Dimensions</label>
+                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                    Dimensions
+                  </label>
                   <input
                     type="text"
                     value={newProductState.dimensions}
-                    onChange={(e) => setNewProductState(s => ({ ...s, dimensions: e.target.value }))}
+                    onChange={(e) =>
+                      setNewProductState((s) => ({
+                        ...s,
+                        dimensions: e.target.value,
+                      }))
+                    }
                     className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">Base Price</label>
+                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                    Base Price
+                  </label>
                   <input
                     type="number"
                     value={newProductState.basePrice}
-                    onChange={(e) => setNewProductState(s => ({ ...s, basePrice: e.target.value }))}
+                    onChange={(e) =>
+                      setNewProductState((s) => ({
+                        ...s,
+                        basePrice: e.target.value,
+                      }))
+                    }
                     className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
                   />
                 </div>
               </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Image File
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setNewProductState((s) => ({
+                      ...s,
+                      imageFile: e.target.files ? e.target.files[0] : null,
+                    }))
+                  }
+                  className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
+                />
+              </div>
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={handleAddProduct} className="primary-btn text-[12px] bg-green-700 hover:bg-green-800">
-                  Save Product
+                <button
+                  type="button"
+                  onClick={handleAddProduct}
+                  disabled={isUploading}
+                  className="primary-btn text-[12px] bg-green-700 hover:bg-green-800 disabled:opacity-50"
+                >
+                  {isUploading ? "Uploading..." : "Save Product"}
                 </button>
-                <button type="button" onClick={() => setIsAddingProduct(false)} className="secondary-btn text-[12px] bg-white">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingProduct(false)}
+                  className="secondary-btn text-[12px] bg-white"
+                >
                   Cancel
                 </button>
               </div>
@@ -451,8 +556,12 @@ export function AdminPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (window.confirm(`Are you sure you want to delete ${p.name}?`)) {
-                              removeProduct(p.id)
+                            if (
+                              window.confirm(
+                                `Are you sure you want to delete ${p.name}?`,
+                              )
+                            ) {
+                              removeProduct(p.id);
                             }
                           }}
                           className="text-red-500 hover:text-red-700 text-[11px] font-bold uppercase tracking-wider text-right"
