@@ -6,19 +6,24 @@ import { RuleMotif } from "../components/RuleMotif";
 export function HomePage() {
   const products = useCatalogStore((state) => state.products);
 
-  /* Curate 4 items for the horizontal pick row */
+  /* Curate items for the horizontal pick row */
   const curatorPicks = useMemo(() => {
-    const picks = [
-      products.find((p) => p.id === "chair-002"), // Sage Wing
-      products.find((p) => p.id === "home-001"),   // Curator's Divius
-      products.find((p) => p.id === "table-001"),  // Heirloom Dining
-      products.find((p) => p.id === "home-002"),   // Odyssey Hutton
-    ].filter(Boolean);
-    return picks.length >= 4 ? picks : [...products].slice(0, 4);
+    const explicitlyFeatured = products.filter((p) => p.isHomepageFeatured);
+    const picks = [...explicitlyFeatured];
+    // Fill up to 4 if needed to maintain design
+    if (picks.length < 4) {
+      const others = products.filter((p) => !p.isHomepageFeatured);
+      picks.push(...others.slice(0, 4 - picks.length));
+    }
+    return picks;
   }, [products]);
 
-  const heroImg1 = products.find((p) => p.id === "home-001")?.image ?? "/images/wooden-cabinet.png";
-  const heroImg2 = products.find((p) => p.id === "chair-002")?.image ?? "/images/chair-sage.png";
+  const heroImg1 =
+    products.find((p) => p.id === "home-001")?.image ??
+    "/images/wooden-cabinet.png";
+  const heroImg2 =
+    products.find((p) => p.id === "chair-002")?.image ??
+    "/images/chair-sage.png";
   const materialImg = "/images/craftsman.png";
   const sideboardImg = "/images/modern-sideboard.png";
 
@@ -35,9 +40,9 @@ export function HomePage() {
             <span className="italic text-[var(--primary)]">Silence</span>
           </h1>
           <p className="mt-5 max-w-lg text-[14px] leading-[1.7] text-[var(--text-mid)]">
-            Discover the harmony between form and living craft.
-            Every piece is designed to bring a sense of quiet
-            permanence to your contemporary sanctuary.
+            Discover the harmony between form and living craft. Every piece is
+            designed to bring a sense of quiet permanence to your contemporary
+            sanctuary.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <button type="button" className="primary-btn" id="hero-explore-btn">
@@ -72,7 +77,8 @@ export function HomePage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-mid)]">
-              a daily focus on modern, distinctive classics, handcrafted furniture and more.
+              a daily focus on modern, distinctive classics, handcrafted
+              furniture and more.
             </p>
             <h2 className="font-display text-[32px] leading-tight text-[var(--text-dark)] sm:text-[36px]">
               The Digital Curator&apos;s Pick
@@ -97,7 +103,10 @@ export function HomePage() {
       </section>
 
       {/* ═══ HONEST MATERIALS ═══════════════════════ */}
-      <section className="grid items-center gap-10 lg:grid-cols-2" id="honest-materials">
+      <section
+        className="grid items-center gap-10 lg:grid-cols-2"
+        id="honest-materials"
+      >
         <div>
           <h2 className="font-display text-[34px] leading-[1.12] text-[var(--text-dark)] sm:text-[40px]">
             Honest Materials.{" "}
@@ -106,15 +115,15 @@ export function HomePage() {
             </span>
           </h2>
           <p className="mt-5 max-w-lg text-[14px] leading-[1.7] text-[var(--text-mid)]">
-            We believe furniture should tell a story worth repeating. In a world of disposable convenience, our
-            "Honest Material" movement — where the wood grain is
-            embraced and the visible construction provides testament to
-            the artisan&apos;s touch.
+            We believe furniture should tell a story worth repeating. In a world
+            of disposable convenience, our "Honest Material" movement — where
+            the wood grain is embraced and the visible construction provides
+            testament to the artisan&apos;s touch.
           </p>
           <p className="mt-4 max-w-lg text-[13px] leading-[1.7] text-[var(--text-mid)]">
-            Every piece at Furniture Odyssey is crafted to ensure the
-            finest for us, preserving all of nature&apos;s warmth for your home&apos;s
-            next chapter.
+            Every piece at Furniture Odyssey is crafted to ensure the finest for
+            us, preserving all of nature&apos;s warmth for your home&apos;s next
+            chapter.
           </p>
           <button type="button" className="text-link mt-6 block">
             Browse the Craftsmanship →

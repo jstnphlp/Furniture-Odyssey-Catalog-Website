@@ -8,7 +8,7 @@ interface CatalogState {
 
   // Admin mutations
   addProduct: (product: Product | CustomizableTable) => void
-  updateProduct: (id: string, updates: Partial<Pick<Product, 'name' | 'description' | 'dimensions' | 'basePrice'>>) => void
+  updateProduct: (id: string, updates: Partial<Pick<Product, 'name' | 'description' | 'dimensions' | 'basePrice' | 'isHomepageFeatured'>>) => void
   updateTableOption: (productId: string, group: 'Top' | 'Legs' | 'Base', optionId: string, updates: Partial<Pick<TableOption, 'priceModifier' | 'available' | 'name'>>) => void
   toggleOptionAvailability: (productId: string, group: 'Top' | 'Legs' | 'Base', optionId: string) => void
 }

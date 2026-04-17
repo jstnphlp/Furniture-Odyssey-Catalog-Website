@@ -122,10 +122,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
             : "lg:grid-cols-1";
 
           return (
-            <div
-              key={`row-${rowIndex}`}
-              className={`grid gap-6 ${gridCols}`}
-            >
+            <div key={`row-${rowIndex}`} className={`grid gap-6 ${gridCols}`}>
               {/* Featured */}
               {featured && (
                 <div className="flex flex-col justify-between rounded-[14px] bg-white p-6 shadow-sm ring-1 ring-black/5 hover:shadow-md transition-shadow">

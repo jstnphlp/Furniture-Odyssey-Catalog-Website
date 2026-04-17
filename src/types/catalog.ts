@@ -14,6 +14,7 @@ export interface Product {
   features?: string[]
   colorwaysCount?: number
   ctaLabel?: string
+  isHomepageFeatured?: boolean
 }
 
 export interface TableOption {
