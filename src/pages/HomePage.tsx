@@ -1,19 +1,94 @@
-import { useMemo } from "react";
-import { useCatalogStore } from "../stores/useCatalogStore";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "../lib/client";
+import type { Product } from "../types/catalog";
 import { MiniCard } from "../components/MiniCard";
 import { RuleMotif } from "../components/RuleMotif";
 
+const supabase = createClient();
+const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
+const MAX_HOMEPAGE_FEATURED = 4;
+
+const mapDbProduct = (row: any): Product => {
+  const rawFeatures = Array.isArray(row.features) ? row.features : [];
+  const features = rawFeatures.filter(
+    (feature: string) => feature !== HOMEPAGE_FEATURE_MARKER,
+  );
+  const featuredFromColumn =
+    Boolean(row.is_featured) || Boolean(row.is_homepage_featured);
+
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    basePrice: row.base_price ?? 0,
+    image: row.image,
+    description: row.description,
+    dimensions: row.dimensions,
+    badge: row.badge,
+    badgeTone: row.badge_tone,
+    isCustomizable: row.is_customizable ?? false,
+    features,
+    colorwaysCount: row.colorways_count,
+    ctaLabel: row.cta_label,
+    isHomepageFeatured:
+      featuredFromColumn || rawFeatures.includes(HOMEPAGE_FEATURE_MARKER),
+  };
+};
+
 export function HomePage() {
-  const products = useCatalogStore((state) => state.products);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchProducts = async (showLoader = true) => {
+      if (showLoader) setLoading(true);
+
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Failed to fetch homepage products", error);
+        if (showLoader && isMounted) setLoading(false);
+        return;
+      }
+
+      if (isMounted) {
+        setProducts((data ?? []).map(mapDbProduct));
+        setLoading(false);
+      }
+    };
+
+    void fetchProducts();
+
+    const channel = supabase
+      .channel("homepage-products-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          void fetchProducts(false);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   /* Curate items for the horizontal pick row */
   const curatorPicks = useMemo(() => {
     const explicitlyFeatured = products.filter((p) => p.isHomepageFeatured);
-    const picks = [...explicitlyFeatured];
+    const picks = [...explicitlyFeatured.slice(0, MAX_HOMEPAGE_FEATURED)];
     // Fill up to 4 if needed to maintain design
-    if (picks.length < 4) {
+    if (picks.length < MAX_HOMEPAGE_FEATURED) {
       const others = products.filter((p) => !p.isHomepageFeatured);
-      picks.push(...others.slice(0, 4 - picks.length));
+      picks.push(...others.slice(0, MAX_HOMEPAGE_FEATURED - picks.length));
     }
     return picks;
   }, [products]);
@@ -26,6 +101,20 @@ export function HomePage() {
     "/images/chair-sage.png";
   const materialImg = "/images/craftsman.png";
   const sideboardImg = "/images/modern-sideboard.png";
+
+  if (loading && products.length === 0) {
+    return (
+      <div className="animate-pulse space-y-8">
+        <div className="h-[380px] rounded-2xl bg-black/5" />
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="h-[260px] rounded-2xl bg-black/5" />
+          <div className="h-[260px] rounded-2xl bg-black/5" />
+          <div className="h-[260px] rounded-2xl bg-black/5" />
+          <div className="h-[260px] rounded-2xl bg-black/5" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

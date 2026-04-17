@@ -7,6 +7,7 @@ interface LiveCatalogProps {
 }
 
 const supabase = createClient();
+const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
 
 export function LiveCatalog({ category }: LiveCatalogProps) {
   const [items, setItems] = useState<any[]>([]);
@@ -33,7 +34,9 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           badge: d.badge,
           badgeTone: d.badge_tone,
           isCustomizable: d.is_customizable ?? false,
-          features: d.features ?? [],
+          features: Array.isArray(d.features)
+            ? d.features.filter((f: string) => f !== HOMEPAGE_FEATURE_MARKER)
+            : [],
           colorwaysCount: d.colorways_count,
           ctaLabel: d.cta_label,
           isFeatured: d.is_featured ?? false,

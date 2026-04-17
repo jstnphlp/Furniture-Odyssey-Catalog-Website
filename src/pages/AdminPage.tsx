@@ -1,11 +1,14 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../lib/client";
 import { useAdminStore } from "../stores/useAdminStore";
 import { useCatalogStore } from "../stores/useCatalogStore";
 import { isCustomizableTable } from "../types/catalog";
-import type { Product, CustomizableTable } from "../types/catalog";
+import type { Product, CustomizableTable, TableOption } from "../types/catalog";
 
 const supabase = createClient();
+const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
+const MAX_HOMEPAGE_FEATURED = 4;
+type OptionGroup = "Top" | "Legs" | "Base";
 
 const STATIC_IMAGE_SEED_PRODUCTS = [
   {
@@ -169,17 +172,16 @@ export function AdminPage() {
   const adminEmail = useAdminStore((s) => s.adminEmail);
   const logout = useAdminStore((s) => s.logout);
   const products = useCatalogStore((s) => s.products);
+  const setProducts = useCatalogStore((s) => s.setProducts);
   const addProduct = useCatalogStore((s) => s.addProduct);
   const removeProduct = useCatalogStore((s) => s.removeProduct);
   const updateProduct = useCatalogStore((s) => s.updateProduct);
   const updateTableOption = useCatalogStore((s) => s.updateTableOption);
-  const toggleOptionAvailability = useCatalogStore(
-    (s) => s.toggleOptionAvailability,
-  );
 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSeedingCatalog, setIsSeedingCatalog] = useState(false);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [newProductState, setNewProductState] = useState<{
     name: string;
     description: string;
@@ -204,6 +206,10 @@ export function AdminPage() {
     dimensions: string;
     basePrice: string;
   }>({ name: "", description: "", dimensions: "", basePrice: "" });
+  const [savingProductId, setSavingProductId] = useState<string | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(
+    null,
+  );
   const [saveFlash, setSaveFlash] = useState<string | null>(null);
 
   const configurableTables = useMemo(
@@ -212,6 +218,107 @@ export function AdminPage() {
   );
 
   const allProducts = products;
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAdminCatalog = async () => {
+      setIsCatalogLoading(true);
+
+      const [
+        { data: productRows, error: productsError },
+        { data: optionRows, error: optionsError },
+      ] = await Promise.all([
+        supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("table_options")
+          .select("*")
+          .order("created_at", { ascending: true }),
+      ]);
+
+      if (!mounted) return;
+
+      if (productsError || optionsError) {
+        setIsCatalogLoading(false);
+        alert(
+          `Failed to load admin catalog: ${productsError?.message ?? optionsError?.message}`,
+        );
+        return;
+      }
+
+      const groupedOptions = new Map<
+        string,
+        { Top: TableOption[]; Legs: TableOption[]; Base: TableOption[] }
+      >();
+
+      for (const option of optionRows ?? []) {
+        const group = option.option_group as OptionGroup;
+        if (!groupedOptions.has(option.product_id)) {
+          groupedOptions.set(option.product_id, {
+            Top: [],
+            Legs: [],
+            Base: [],
+          });
+        }
+
+        groupedOptions.get(option.product_id)?.[group].push({
+          id: option.id,
+          name: option.name,
+          priceModifier: Number(option.price_modifier ?? 0),
+          layerUrl: option.layer_url,
+          available: option.available ?? true,
+          incompatibleWith: [],
+        });
+      }
+
+      const mappedProducts = (productRows ?? []).map((row: any) => {
+        const features = Array.isArray(row.features) ? row.features : [];
+        const baseProduct: Product = {
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          basePrice: Number(row.base_price ?? 0),
+          image: row.image,
+          description: row.description ?? undefined,
+          dimensions: row.dimensions ?? undefined,
+          badge: row.badge ?? undefined,
+          badgeTone: row.badge_tone ?? undefined,
+          isCustomizable: Boolean(row.is_customizable),
+          features,
+          colorwaysCount: row.colorways_count ?? undefined,
+          ctaLabel: row.cta_label ?? undefined,
+          isHomepageFeatured: features.includes(HOMEPAGE_FEATURE_MARKER),
+        };
+
+        if (baseProduct.isCustomizable && row.category === "Tables") {
+          return {
+            ...baseProduct,
+            category: "Tables",
+            isCustomizable: true,
+            options: groupedOptions.get(row.id) ?? {
+              Top: [],
+              Legs: [],
+              Base: [],
+            },
+          } as CustomizableTable;
+        }
+
+        return baseProduct;
+      });
+
+      setProducts(mappedProducts);
+      setIsCatalogLoading(false);
+    };
+
+    void loadAdminCatalog();
+
+    return () => {
+      mounted = false;
+    };
+  }, [setProducts]);
 
   const flash = (id: string) => {
     setSaveFlash(id);
@@ -228,16 +335,123 @@ export function AdminPage() {
     });
   };
 
-  const saveEditing = () => {
+  const saveEditing = async () => {
     if (!editingProduct) return;
-    updateProduct(editingProduct, {
-      name: formState.name,
+
+    const productToEdit = products.find((p) => p.id === editingProduct);
+    if (!productToEdit) return;
+
+    setSavingProductId(editingProduct);
+
+    const nextBasePrice = Number(formState.basePrice) || 0;
+    const payload = {
+      id: productToEdit.id,
+      name: formState.name.trim(),
+      category: productToEdit.category,
+      base_price: nextBasePrice,
+      image: productToEdit.image,
       description: formState.description,
       dimensions: formState.dimensions,
-      basePrice: Number(formState.basePrice) || 0,
+      is_customizable: productToEdit.isCustomizable,
+      features: Array.isArray(productToEdit.features)
+        ? productToEdit.features
+        : [],
+    };
+
+    const { error: upsertError } = await supabase
+      .from("products")
+      .upsert(payload, { onConflict: "id" });
+
+    if (upsertError) {
+      setSavingProductId(null);
+      alert(`Failed to save product: ${upsertError.message}`);
+      return;
+    }
+
+    updateProduct(editingProduct, {
+      name: payload.name,
+      description: formState.description,
+      dimensions: formState.dimensions,
+      basePrice: nextBasePrice,
     });
     flash(editingProduct);
     setEditingProduct(null);
+    setSavingProductId(null);
+  };
+
+  const handleDeleteProduct = async (p: Product | CustomizableTable) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${p.name}?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingProductId(p.id);
+
+    const { error: deleteError } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", p.id);
+
+    if (deleteError) {
+      setDeletingProductId(null);
+      alert(`Failed to delete product: ${deleteError.message}`);
+      return;
+    }
+
+    removeProduct(p.id);
+    setDeletingProductId(null);
+  };
+
+  const handlePriceModifierChange = async (
+    productId: string,
+    group: OptionGroup,
+    optionId: string,
+    nextPriceModifier: number,
+  ) => {
+    const normalized = Number.isFinite(nextPriceModifier)
+      ? nextPriceModifier
+      : 0;
+
+    const { error: optionUpdateError } = await supabase
+      .from("table_options")
+      .update({ price_modifier: normalized })
+      .eq("id", optionId)
+      .eq("product_id", productId);
+
+    if (optionUpdateError) {
+      alert(`Failed to update price modifier: ${optionUpdateError.message}`);
+      return;
+    }
+
+    updateTableOption(productId, group, optionId, {
+      priceModifier: normalized,
+    });
+    flash(`${productId}-${optionId}`);
+  };
+
+  const handleOptionAvailabilityToggle = async (
+    productId: string,
+    group: OptionGroup,
+    optionId: string,
+    currentAvailable: boolean,
+  ) => {
+    const nextAvailable = !currentAvailable;
+
+    const { error: availabilityError } = await supabase
+      .from("table_options")
+      .update({ available: nextAvailable })
+      .eq("id", optionId)
+      .eq("product_id", productId);
+
+    if (availabilityError) {
+      alert(`Failed to update availability: ${availabilityError.message}`);
+      return;
+    }
+
+    updateTableOption(productId, group, optionId, {
+      available: nextAvailable,
+    });
+    flash(optionId);
   };
 
   const handleAddProduct = async () => {
@@ -263,12 +477,33 @@ export function AdminPage() {
         .getPublicUrl(filePath);
 
       const newId = `prod-${Date.now()}`;
-      addProduct({
+      const payload = {
         id: newId,
-        name: newProductState.name,
+        name: newProductState.name.trim(),
+        category: newProductState.category,
+        base_price: Number(newProductState.basePrice) || 0,
+        image: publicUrlData.publicUrl,
         description: newProductState.description,
         dimensions: newProductState.dimensions,
-        basePrice: Number(newProductState.basePrice) || 0,
+        is_customizable: false,
+      };
+
+      const { error: insertError } = await supabase
+        .from("products")
+        .insert(payload);
+
+      if (insertError) {
+        // Best-effort cleanup: avoid orphaned files when DB insert fails.
+        await supabase.storage.from("product-images").remove([filePath]);
+        throw insertError;
+      }
+
+      addProduct({
+        id: newId,
+        name: payload.name,
+        description: newProductState.description,
+        dimensions: newProductState.dimensions,
+        basePrice: payload.base_price,
         category: newProductState.category,
         image: publicUrlData.publicUrl,
         isCustomizable: false,
@@ -335,6 +570,58 @@ export function AdminPage() {
     } finally {
       setIsSeedingCatalog(false);
     }
+  };
+
+  const isHomepageFeatured = (p: Product | CustomizableTable) => {
+    const fromFlag = p.isHomepageFeatured ?? false;
+    const fromFeatures =
+      Array.isArray(p.features) && p.features.includes(HOMEPAGE_FEATURE_MARKER);
+    return fromFlag || fromFeatures;
+  };
+
+  const handleToggleHomepageFeature = async (
+    p: Product | CustomizableTable,
+  ) => {
+    const currentFeatures = Array.isArray(p.features) ? p.features : [];
+    const currentlyFeatured = isHomepageFeatured(p);
+
+    if (!currentlyFeatured) {
+      const featuredCount = products.filter((item) =>
+        isHomepageFeatured(item),
+      ).length;
+      if (featuredCount >= MAX_HOMEPAGE_FEATURED) {
+        alert(`You can only feature up to ${MAX_HOMEPAGE_FEATURED} products.`);
+        return;
+      }
+    }
+
+    const nextFeatures = currentlyFeatured
+      ? currentFeatures.filter((f) => f !== HOMEPAGE_FEATURE_MARKER)
+      : [...new Set([...currentFeatures, HOMEPAGE_FEATURE_MARKER])];
+
+    const { data: updatedRows, error: updateError } = await supabase
+      .from("products")
+      .update({ features: nextFeatures })
+      .eq("id", p.id)
+      .select("id");
+
+    if (updateError) {
+      alert(`Failed to update homepage feature: ${updateError.message}`);
+      return;
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      alert(
+        "Could not save homepage feature setting. Database update is blocked by RLS policy.",
+      );
+      return;
+    }
+
+    updateProduct(p.id, {
+      isHomepageFeatured: !currentlyFeatured,
+      features: nextFeatures,
+    });
+    flash(p.id);
   };
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
@@ -417,6 +704,12 @@ export function AdminPage() {
         ))}
       </div>
 
+      {isCatalogLoading && (
+        <p className="text-[12px] text-[var(--text-mid)]">
+          Syncing admin values from database...
+        </p>
+      )}
+
       {/* ═══ TAB: Price Modifiers ═══ */}
       {activeTab === "prices" && (
         <div className="space-y-6">
@@ -462,10 +755,12 @@ export function AdminPage() {
                             type="number"
                             value={opt.priceModifier}
                             onChange={(e) => {
-                              updateTableOption(table.id, group, opt.id, {
-                                priceModifier: Number(e.target.value) || 0,
-                              });
-                              flash(`${table.id}-${opt.id}`);
+                              void handlePriceModifierChange(
+                                table.id,
+                                group,
+                                opt.id,
+                                Number(e.target.value) || 0,
+                              );
                             }}
                             className="w-24 rounded-lg border border-[var(--border-card)] bg-[var(--bg-cream)] px-3 py-1.5 text-[14px] font-semibold text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
                             min="0"
@@ -547,8 +842,12 @@ export function AdminPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              toggleOptionAvailability(table.id, group, opt.id);
-                              flash(opt.id);
+                              void handleOptionAvailabilityToggle(
+                                table.id,
+                                group,
+                                opt.id,
+                                isAvailable,
+                              );
                             }}
                             className={`relative h-7 w-12 rounded-full transition-colors ${
                               isAvailable ? "bg-green-500" : "bg-gray-300"
@@ -770,17 +1069,14 @@ export function AdminPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (
-                              window.confirm(
-                                `Are you sure you want to delete ${p.name}?`,
-                              )
-                            ) {
-                              removeProduct(p.id);
-                            }
+                            void handleDeleteProduct(p);
                           }}
+                          disabled={deletingProductId === p.id}
                           className="text-red-500 hover:text-red-700 text-[11px] font-bold uppercase tracking-wider text-right"
                         >
-                          Delete
+                          {deletingProductId === p.id
+                            ? "Deleting..."
+                            : "Delete"}
                         </button>
                       </div>
                     </div>
@@ -798,18 +1094,15 @@ export function AdminPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          updateProduct(p.id, {
-                            isHomepageFeatured: !p.isHomepageFeatured,
-                          });
-                          flash(p.id);
+                          void handleToggleHomepageFeature(p);
                         }}
                         className={`relative h-6 w-10 rounded-full transition-colors ${
-                          p.isHomepageFeatured ? "bg-green-500" : "bg-gray-300"
+                          isHomepageFeatured(p) ? "bg-green-500" : "bg-gray-300"
                         }`}
                       >
                         <span
                           className={`absolute top-[2px] h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                            p.isHomepageFeatured ? "left-[18px]" : "left-[2px]"
+                            isHomepageFeatured(p) ? "left-[18px]" : "left-[2px]"
                           }`}
                         />
                       </button>
@@ -885,10 +1178,15 @@ export function AdminPage() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={saveEditing}
+                        onClick={() => {
+                          void saveEditing();
+                        }}
+                        disabled={savingProductId === p.id}
                         className="primary-btn text-[12px]"
                       >
-                        Save Changes
+                        {savingProductId === p.id
+                          ? "Saving..."
+                          : "Save Changes"}
                       </button>
                       <button
                         type="button"
