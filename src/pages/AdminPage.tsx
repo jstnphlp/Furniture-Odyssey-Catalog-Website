@@ -1,11 +1,167 @@
 import { useState, useMemo } from "react";
 import { createClient } from "../lib/client";
 import { useAdminStore } from "../stores/useAdminStore";
-
-const supabase = createClient();
 import { useCatalogStore } from "../stores/useCatalogStore";
 import { isCustomizableTable } from "../types/catalog";
 import type { Product, CustomizableTable } from "../types/catalog";
+
+const supabase = createClient();
+
+const STATIC_IMAGE_SEED_PRODUCTS = [
+  {
+    id: "seed-chair-artisan-lounge",
+    name: "Artisan Lounge Chair",
+    category: "Chairs" as const,
+    base_price: 4200,
+    image: "/images/chair-artisan-lounge.png",
+    description: "Hand-finished lounge chair with a sculpted profile.",
+    dimensions: "74W x 82D x 88H cm",
+  },
+  {
+    id: "seed-chair-modern-dining",
+    name: "Modern Dining Chair",
+    category: "Chairs" as const,
+    base_price: 3600,
+    image: "/images/chair-modern-dining.png",
+    description: "A refined dining chair designed for everyday comfort.",
+    dimensions: "52W x 57D x 82H cm",
+  },
+  {
+    id: "seed-chair-sage",
+    name: "Sage Accent Chair",
+    category: "Chairs" as const,
+    base_price: 3900,
+    image: "/images/chair-sage.png",
+    description: "Soft contours and plush upholstery in a calming tone.",
+    dimensions: "70W x 78D x 86H cm",
+  },
+  {
+    id: "seed-dining-chair",
+    name: "Heritage Dining Chair",
+    category: "Chairs" as const,
+    base_price: 3300,
+    image: "/images/dining-chair.png",
+    description: "Classic proportions with sturdy handcrafted detailing.",
+    dimensions: "50W x 56D x 84H cm",
+  },
+  {
+    id: "seed-ember-lounge",
+    name: "Ember Lounge",
+    category: "Chairs" as const,
+    base_price: 4500,
+    image: "/images/ember-lounge.png",
+    description: "A low, inviting lounge silhouette for relaxed spaces.",
+    dimensions: "78W x 84D x 80H cm",
+  },
+  {
+    id: "seed-white-stool",
+    name: "White Counter Stool",
+    category: "Chairs" as const,
+    base_price: 2400,
+    image: "/images/white-stool.png",
+    description: "Minimal counter-height stool with a clean modern form.",
+    dimensions: "44W x 44D x 66H cm",
+  },
+  {
+    id: "seed-console-table",
+    name: "Console Table",
+    category: "Tables" as const,
+    base_price: 6100,
+    image: "/images/console-table.png",
+    description: "Slim profile table suited for entryways and galleries.",
+    dimensions: "140W x 38D x 80H cm",
+  },
+  {
+    id: "seed-hero-table",
+    name: "Hero Dining Table",
+    category: "Tables" as const,
+    base_price: 9800,
+    image: "/images/hero-table.png",
+    description: "Statement dining table crafted for warm gatherings.",
+    dimensions: "200W x 95D x 76H cm",
+  },
+  {
+    id: "seed-pedestal-table",
+    name: "Pedestal Table",
+    category: "Tables" as const,
+    base_price: 7600,
+    image: "/images/pedestal-table.png",
+    description: "Balanced pedestal form with generous surface area.",
+    dimensions: "120W x 120D x 74H cm",
+  },
+  {
+    id: "seed-modern-sideboard",
+    name: "Modern Sideboard",
+    category: "Tables" as const,
+    base_price: 8400,
+    image: "/images/modern-sideboard.png",
+    description: "Versatile storage sideboard with minimalist lines.",
+    dimensions: "180W x 45D x 78H cm",
+  },
+  {
+    id: "seed-wooden-cabinet",
+    name: "Wooden Cabinet",
+    category: "Tables" as const,
+    base_price: 8900,
+    image: "/images/wooden-cabinet.png",
+    description: "Solid wood cabinet built for timeless interiors.",
+    dimensions: "160W x 48D x 82H cm",
+  },
+  {
+    id: "seed-hero-chair",
+    name: "Hero Lounge Chair",
+    category: "Chairs" as const,
+    base_price: 4300,
+    image: "/images/hero-chair.png",
+    description: "Hero-piece lounge chair with tailored upholstery.",
+    dimensions: "76W x 82D x 88H cm",
+  },
+  {
+    id: "seed-cloud-modular",
+    name: "Cloud Modular",
+    category: "Collections" as const,
+    base_price: 12400,
+    image: "/images/cloud-modular.png",
+    description: "Modular seating composition for flexible living rooms.",
+    dimensions: "Variable configuration",
+  },
+  {
+    id: "seed-craftsman-story",
+    name: "Craftsman Editorial",
+    category: "Collections" as const,
+    base_price: 1200,
+    image: "/images/craftsman.png",
+    description: "Editorial showcase highlighting artisan workshop process.",
+    dimensions: "Gallery piece",
+  },
+  {
+    id: "seed-portrait-art",
+    name: "Portrait Art Piece",
+    category: "Collections" as const,
+    base_price: 2100,
+    image: "/images/portrait-art.png",
+    description: "Curated framed portrait to complete living spaces.",
+    dimensions: "90W x 4D x 120H cm",
+  },
+  {
+    id: "seed-shelf-decor",
+    name: "Shelf Decor Set",
+    category: "Collections" as const,
+    base_price: 1400,
+    image: "/images/shelf-decor.png",
+    description: "Decorative shelf objects for layered styling.",
+    dimensions: "Assorted set",
+  },
+  {
+    id: "seed-wood-grain",
+    name: "Wood Grain Collection",
+    category: "Collections" as const,
+    base_price: 1700,
+    image: "/images/wood-grain.png",
+    description: "Material study panel celebrating natural wood textures.",
+    dimensions: "120W x 3D x 80H cm",
+  },
+];
 
 type Tab = "prices" | "availability" | "content";
 
@@ -23,6 +179,7 @@ export function AdminPage() {
 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSeedingCatalog, setIsSeedingCatalog] = useState(false);
   const [newProductState, setNewProductState] = useState<{
     name: string;
     description: string;
@@ -132,6 +289,51 @@ export function AdminPage() {
       alert("Error adding product: " + err.message);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSeedStaticCatalog = async () => {
+    setIsSeedingCatalog(true);
+
+    try {
+      const seedIds = STATIC_IMAGE_SEED_PRODUCTS.map((item) => item.id);
+      const { data: existingRows, error: existingError } = await supabase
+        .from("products")
+        .select("id")
+        .in("id", seedIds);
+
+      if (existingError) {
+        throw existingError;
+      }
+
+      const existingIds = new Set((existingRows ?? []).map((row) => row.id));
+      const rowsToInsert = STATIC_IMAGE_SEED_PRODUCTS.filter(
+        (row) => !existingIds.has(row.id),
+      ).map((row) => ({
+        ...row,
+        is_customizable: false,
+      }));
+
+      if (rowsToInsert.length === 0) {
+        alert("All static products already exist in the database.");
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from("products")
+        .insert(rowsToInsert);
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      alert(
+        `Added ${rowsToInsert.length} static products to the database. Reload the catalog pages to see them.`,
+      );
+    } catch (err: any) {
+      alert(`Failed to seed static products: ${err.message}`);
+    } finally {
+      setIsSeedingCatalog(false);
     }
   };
 
@@ -379,52 +581,13 @@ export function AdminPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  const images = [
-                    "chair-artisan-lounge.png",
-                    "chair-modern-dining.png",
-                    "chair-sage.png",
-                    "cloud-modular.png",
-                    "console-table.png",
-                    "craftsman.png",
-                    "dining-chair.png",
-                    "ember-lounge.png",
-                    "hero-chair.png",
-                    "hero-table.png",
-                    "modern-sideboard.png",
-                    "pedestal-table.png",
-                    "portrait-art.png",
-                    "shelf-decor.png",
-                    "white-stool.png",
-                    "wooden-cabinet.png"
-                  ];
-                  let added = 0;
-                  images.forEach((img, i) => {
-                    // Skip if already in the products list
-                    if (products.some(p => p.image.includes(img))) return;
-                    
-                    const name = img.split('.')[0].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                    const isChair = name.toLowerCase().includes('chair') || name.toLowerCase().includes('lounge') || name.toLowerCase().includes('stool');
-                    const isTable = name.toLowerCase().includes('table') || name.toLowerCase().includes('sideboard') || name.toLowerCase().includes('cabinet');
-                    
-                    addProduct({
-                      id: `seed-${Date.now()}-${i}`,
-                      name: name,
-                      description: `Imported from local files`,
-                      dimensions: "Standard",
-                      basePrice: 299 + i * 50,
-                      category: isChair ? 'Chairs' : isTable ? 'Tables' : 'Collections',
-                      image: `/images/${img}`,
-                      isCustomizable: false,
-                      isHomepageFeatured: false,
-                    });
-                    added++;
-                  });
-                  alert(`Imported ${added} new local image products!`);
-                }}
+                onClick={handleSeedStaticCatalog}
+                disabled={isSeedingCatalog}
                 className="secondary-btn text-[12px]"
               >
-                Import Local Images
+                {isSeedingCatalog
+                  ? "Seeding DB..."
+                  : "Seed Static Images to DB"}
               </button>
               <button
                 type="button"
