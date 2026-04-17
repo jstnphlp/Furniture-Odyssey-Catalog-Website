@@ -11,6 +11,9 @@ export interface Product {
   badge?: string
   badgeTone?: 'teal' | 'warm' | 'dark'
   isCustomizable: boolean
+  features?: string[]
+  colorwaysCount?: number
+  ctaLabel?: string
 }
 
 export interface TableOption {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isCustomizableTable, Product, CustomizableTable } from './catalog'
+import { isCustomizableTable } from './catalog'
+import type { Product, CustomizableTable } from './catalog'
 
 describe('catalog > isCustomizableTable', () => {
   it('returns true for a customizable table', () => {
