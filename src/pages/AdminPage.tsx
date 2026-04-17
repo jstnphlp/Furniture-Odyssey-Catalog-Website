@@ -376,13 +376,64 @@ export function AdminPage() {
             <p className="text-[13px] text-[var(--text-mid)]">
               Edit product name, description, dimensions, and base price.
             </p>
-            <button
-              type="button"
-              onClick={() => setIsAddingProduct(true)}
-              className="primary-btn text-[12px]"
-            >
-              + Add Product
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const images = [
+                    "chair-artisan-lounge.png",
+                    "chair-modern-dining.png",
+                    "chair-sage.png",
+                    "cloud-modular.png",
+                    "console-table.png",
+                    "craftsman.png",
+                    "dining-chair.png",
+                    "ember-lounge.png",
+                    "hero-chair.png",
+                    "hero-table.png",
+                    "modern-sideboard.png",
+                    "pedestal-table.png",
+                    "portrait-art.png",
+                    "shelf-decor.png",
+                    "white-stool.png",
+                    "wooden-cabinet.png"
+                  ];
+                  let added = 0;
+                  images.forEach((img, i) => {
+                    // Skip if already in the products list
+                    if (products.some(p => p.image.includes(img))) return;
+                    
+                    const name = img.split('.')[0].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const isChair = name.toLowerCase().includes('chair') || name.toLowerCase().includes('lounge') || name.toLowerCase().includes('stool');
+                    const isTable = name.toLowerCase().includes('table') || name.toLowerCase().includes('sideboard') || name.toLowerCase().includes('cabinet');
+                    
+                    addProduct({
+                      id: `seed-${Date.now()}-${i}`,
+                      name: name,
+                      description: `Imported from local files`,
+                      dimensions: "Standard",
+                      basePrice: 299 + i * 50,
+                      category: isChair ? 'Chairs' : isTable ? 'Tables' : 'Collections',
+                      image: `/images/${img}`,
+                      isCustomizable: false,
+                      isHomepageFeatured: false,
+                    });
+                    added++;
+                  });
+                  alert(`Imported ${added} new local image products!`);
+                }}
+                className="secondary-btn text-[12px]"
+              >
+                Import Local Images
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddingProduct(true)}
+                className="primary-btn text-[12px]"
+              >
+                + Add Product
+              </button>
+            </div>
           </div>
 
           {isAddingProduct && (
