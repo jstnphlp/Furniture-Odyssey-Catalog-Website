@@ -1003,6 +1003,14 @@ export function AdminPage() {
   const [editVariations, setEditVariations] = useState<VariationState>(emptyVariationState);
   const [newProductVariations, setNewProductVariations] = useState<VariationState>(emptyVariationState);
 
+  const addFormRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isAddingProduct && addFormRef.current) {
+      addFormRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isAddingProduct]);
+
   const configurableTables = useMemo(
     () => products.filter(isCustomizableTable) as CustomizableTable[],
     [products],
@@ -1111,12 +1119,6 @@ export function AdminPage() {
       mounted = false;
     };
   }, [setProducts]);
-
-  // Load page content
-  useEffect(() => {
-    void pageContent.loadContent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const flash = (id: string) => {
     setSaveFlash(id);
@@ -1593,7 +1595,7 @@ export function AdminPage() {
     }
 
     return (
-      <div className="rounded-xl border border-green-300 bg-green-50/50 p-5 space-y-3">
+      <div ref={addFormRef} className="rounded-xl border border-green-300 bg-green-50/50 p-5 space-y-3">
         <h3 className="font-display text-[20px] text-green-800">
           Add New Product
         </h3>

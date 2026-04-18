@@ -36,8 +36,10 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
 
   useEffect(() => {
-    async function fetchItems() {
-      setLoading(true);
+    let isMounted = true;
+
+    async function fetchItems(showLoader = true) {
+      if (showLoader) setLoading(true);
 
       // Fetch products and their Color/Size options in parallel
       const [{ data: productData }, { data: optionData }] = await Promise.all([
@@ -53,7 +55,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           .order("created_at", { ascending: true }),
       ]);
 
-      if (productData) {
+      if (productData && isMounted) {
         // Group options by product_id
         const optionsByProduct = new Map<string, { color: TableOption[]; size: TableOption[] }>();
         for (const opt of optionData ?? []) {
@@ -98,9 +100,26 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
 
         setItems(fetched);
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-    fetchItems();
+
+    void fetchItems();
+
+    const channel = supabase
+      .channel(`live-catalog-${category}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products", filter: `category=eq.${category}` },
+        () => {
+          void fetchItems(false);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      void supabase.removeChannel(channel);
+    };
   }, [category]);
 
   const openModal = useCallback((item: CatalogItem) => {

@@ -54,9 +54,16 @@ export function SiteNav({
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          className="select-none font-display text-[17px] font-semibold text-[var(--text-dark)] transition-opacity hover:opacity-75"
+          className="group flex select-none items-center gap-2.5 transition-opacity hover:opacity-75"
         >
-          {brandName}
+          <img
+            src="/fologo7.svg"
+            alt="Furniture Odyssey Logo"
+            className="h-10 w-10 object-contain"
+          />
+          <span className="font-display text-[17px] font-semibold text-[var(--text-dark)]">
+            Furniture <span style={{ color: '#b97f50' }}>Odyssey</span>
+          </span>
         </button>
 
         {/* Center Nav Links */}
@@ -68,11 +75,10 @@ export function SiteNav({
                 type="button"
                 key={item}
                 onClick={() => onNavigate(item)}
-                className={`text-[13px] font-semibold tracking-wide transition ${
-                  isActive
-                    ? 'text-[var(--text-dark)] underline decoration-[var(--primary)] decoration-2 underline-offset-[10px]'
-                    : 'text-[var(--text-mid)] hover:text-[var(--text-dark)]'
-                }`}
+                className={`text-[13px] font-semibold tracking-wide transition ${isActive
+                  ? 'text-[var(--text-dark)] underline decoration-[var(--primary)] decoration-2 underline-offset-[10px]'
+                  : 'text-[var(--text-mid)] hover:text-[var(--text-dark)]'
+                  }`}
               >
                 {item}
               </button>
@@ -83,11 +89,10 @@ export function SiteNav({
             <button
               type="button"
               onClick={() => onNavigate('Admin')}
-              className={`text-[13px] font-semibold tracking-wide transition ${
-                currentPage === 'Admin'
-                  ? 'text-[var(--primary)] underline decoration-[var(--primary)] decoration-2 underline-offset-[10px]'
-                  : 'text-[var(--primary)] opacity-60 hover:opacity-100'
-              }`}
+              className={`text-[13px] font-semibold tracking-wide transition ${currentPage === 'Admin'
+                ? 'text-[var(--primary)] underline decoration-[var(--primary)] decoration-2 underline-offset-[10px]'
+                : 'text-[var(--primary)] opacity-60 hover:opacity-100'
+                }`}
             >
               🔐 Admin
             </button>
