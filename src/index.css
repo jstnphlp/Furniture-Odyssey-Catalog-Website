@@ -10,9 +10,9 @@
    ═══════════════════════════════════════════ */
 
 :root {
-  --primary: #b97f50;
+  --primary: oklch(0.205 0 0);
   --secondary: oklch(0.97 0 0);
-  --tertiary: #008784;
+  --tertiary: #b97f50;
   --bg-cream: #FFF9F0;
   --bg-card: #FFFDF8;
   --text-dark: #2C2218;
@@ -91,7 +91,7 @@ button {
   gap: 6px;
   border: 0;
   border-radius: 8px;
-  background: var(--primary);
+  background: var(--tertiary);
   color: #fff;
   padding: 11px 22px;
   font-size: 13px;
@@ -99,6 +99,7 @@ button {
   letter-spacing: 0.01em;
   transition: background 0.2s ease, transform 0.15s ease;
 }
+
 .primary-btn:hover {
   background: #a94d35;
   transform: translateY(-1px);
@@ -119,6 +120,7 @@ button {
   letter-spacing: 0.01em;
   transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
+
 .secondary-btn:hover {
   background: var(--text-dark);
   color: #fff;
@@ -134,6 +136,7 @@ button {
   padding: 0;
   transition: color 0.2s ease;
 }
+
 .text-link:hover {
   color: var(--primary);
 }
@@ -151,6 +154,7 @@ button {
   justify-content: center;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
+
 .icon-button:hover {
   border-color: var(--text-dark);
   background: var(--bg-cream);
@@ -183,15 +187,18 @@ button {
   letter-spacing: 0.06em;
   transition: all 0.2s ease;
 }
+
 .pill-filter:hover {
   border-color: var(--text-dark);
   color: var(--text-dark);
 }
+
 .pill-filter-active {
   border-color: var(--text-dark);
   background: var(--text-dark);
   color: #fff;
 }
+
 .pill-filter-active:hover {
   background: #3d3025;
   color: #fff;
@@ -206,6 +213,7 @@ button {
   box-shadow: 0 8px 24px var(--shadow-warm);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
+
 .warm-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 16px 32px var(--shadow-warm-hover);
@@ -218,16 +226,19 @@ button {
   gap: 4px;
   padding: 8px 0;
 }
+
 .rule-motif span:nth-child(1) {
   height: 2px;
   width: 100%;
   background: var(--primary);
 }
+
 .rule-motif span:nth-child(2) {
   height: 2px;
   width: 80%;
   background: var(--secondary);
 }
+
 .rule-motif span:nth-child(3) {
   height: 2px;
   width: 60%;
@@ -256,6 +267,7 @@ button {
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -268,14 +280,21 @@ button {
 
 /* ── Modal Animations ─────────────────────── */
 @keyframes fadeInBackdrop {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
+
 @keyframes modalEnter {
   from {
     opacity: 0;
     transform: translateY(24px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -285,6 +304,7 @@ button {
 .animate-fade-in-backdrop {
   animation: fadeInBackdrop 0.2s ease-out both;
 }
+
 .animate-modal-enter {
   animation: modalEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -293,13 +313,16 @@ button {
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--bg-cream);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-warm);
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-mid);
 }
@@ -385,9 +408,11 @@ button {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }

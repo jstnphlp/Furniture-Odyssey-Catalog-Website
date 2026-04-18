@@ -62,7 +62,7 @@ export function SiteNav({
             className="h-10 w-10 object-contain"
           />
           <span className="font-display text-[17px] font-semibold text-[var(--text-dark)]">
-            Furniture <span style={{ color: '#b97f50' }}>Odyssey</span>
+            Furniture <span className="text-[#b97f50]">Odyssey</span>
           </span>
         </button>
 
@@ -76,8 +76,8 @@ export function SiteNav({
                 key={item}
                 onClick={() => onNavigate(item)}
                 className={`text-[13px] font-semibold tracking-wide transition ${isActive
-                  ? 'text-[var(--text-dark)] underline decoration-[var(--primary)] decoration-2 underline-offset-[10px]'
-                  : 'text-[var(--text-mid)] hover:text-[var(--text-dark)]'
+                  ? 'text-[#b97f50] underline decoration-[#b97f50] decoration-2 underline-offset-[10px]'
+                  : 'text-[var(--text-mid)] hover:text-[#b97f50]'
                   }`}
               >
                 {item}
@@ -90,8 +90,8 @@ export function SiteNav({
               type="button"
               onClick={() => onNavigate('Admin')}
               className={`text-[13px] font-semibold tracking-wide transition ${currentPage === 'Admin'
-                ? 'text-[var(--primary)] underline decoration-[var(--primary)] decoration-2 underline-offset-[10px]'
-                : 'text-[var(--primary)] opacity-60 hover:opacity-100'
+                ? 'text-[#b97f50] underline decoration-[#b97f50] decoration-2 underline-offset-[10px]'
+                : 'text-[#b97f50] opacity-60 hover:opacity-100'
                 }`}
             >
               🔐 Admin
@@ -112,18 +112,6 @@ export function SiteNav({
               <path d="M3 5h2l2.3 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H7" />
               <circle cx="10" cy="19" r="1.2" />
               <circle cx="17" cy="19" r="1.2" />
-            </svg>
-          </button>
-          <button type="button" className="icon-button" aria-label="User">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-[18px] w-[18px]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-            >
-              <circle cx="12" cy="8" r="3.2" />
-              <path d="M5 19c1.8-2.8 4.1-4.2 7-4.2s5.2 1.4 7 4.2" />
             </svg>
           </button>
         </div>
