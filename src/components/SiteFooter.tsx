@@ -71,21 +71,20 @@ export function SiteFooter({
           </a>
         </div>
 
-        {/* Col 4: Newsletter */}
-        <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
-          <p className="text-[13px] font-semibold text-[var(--text-dark)]">
-            Newsletter
+        {/* Col 4: Showroom */}
+        <div className="space-y-3">
+          <p className="text-[13px] font-semibold text-[var(--text-dark)] uppercase tracking-wider text-[11px]">
+            Visit our showroom at
           </p>
-          <input
-            type="email"
-            placeholder="Your email"
-            className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2.5 text-[13px] outline-none transition focus:border-[var(--primary)]"
-            id="newsletter-email"
-          />
-          <button type="submit" className="primary-btn w-full">
-            Subscribe
-          </button>
-        </form>
+          <a
+            href="https://www.google.com/maps/place/4774+Sampaguita,+Maynila,+1709+Kalakhang+Maynila/@14.4894802,121.0400177,19z/data=!3m1!4b1!4m6!3m5!1s0x3397cf1b155bdf5d:0x22a8dae78ace0f39!8m2!3d14.4894802!4d121.0406614!16s%2Fg%2F11d_2j37fn?entry=ttu&g_ep=EgoyMDI2MDQxNS4wIKXMDSoASAFQAw%3D%3D"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-[13px] leading-relaxed text-[var(--text-mid)] transition hover:text-[#b97f50]"
+          >
+            4774 Sampaguita, Marimar Village, Parañaque City, Metro Manila
+          </a>
+        </div>
       </div>
 
       {/* Bottom bar */}
