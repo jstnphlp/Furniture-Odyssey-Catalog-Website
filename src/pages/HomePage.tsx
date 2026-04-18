@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "../lib/client";
-import type { Product } from "../types/catalog";
+import type { Product, TableOption } from "../types/catalog";
 import { MiniCard } from "../components/MiniCard";
 import { RuleMotif } from "../components/RuleMotif";
+import { ProductModal } from "../components/ProductModal";
+import type { ProductModalData } from "../components/ProductModal";
 
 const supabase = createClient();
 const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
@@ -42,10 +44,12 @@ const mapDbProduct = (row: any): Product => {
   };
 };
 
-export function HomePage() {
+export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState<Record<string, string>>({});
+  const [variationsByProduct, setVariationsByProduct] = useState<Map<string, { color: TableOption[]; size: TableOption[] }>>(new Map());
+  const [modalData, setModalData] = useState<ProductModalData | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,7 +69,40 @@ export function HomePage() {
       }
 
       if (isMounted) {
-        setProducts((data ?? []).map(mapDbProduct));
+        const mappedProducts = (data ?? []).map(mapDbProduct);
+        setProducts(mappedProducts);
+
+        // Fetch Color/Size variations for all products
+        const productIds = mappedProducts.map((p) => p.id);
+        if (productIds.length > 0) {
+          const { data: optionData } = await supabase
+            .from("table_options")
+            .select("*")
+            .in("product_id", productIds)
+            .in("option_group", ["Color", "Size"])
+            .order("created_at", { ascending: true });
+
+          const varMap = new Map<string, { color: TableOption[]; size: TableOption[] }>();
+          for (const opt of optionData ?? []) {
+            if (!varMap.has(opt.product_id)) {
+              varMap.set(opt.product_id, { color: [], size: [] });
+            }
+            const mapped: TableOption = {
+              id: opt.id,
+              name: opt.name,
+              priceModifier: Number(opt.price_modifier ?? 0),
+              layerUrl: opt.layer_url ?? "",
+              available: opt.available ?? true,
+              incompatibleWith: [],
+            };
+            if (opt.option_group === "Color") {
+              varMap.get(opt.product_id)!.color.push(mapped);
+            } else {
+              varMap.get(opt.product_id)!.size.push(mapped);
+            }
+          }
+          setVariationsByProduct(varMap);
+        }
         setLoading(false);
       }
     };
@@ -142,6 +179,19 @@ export function HomePage() {
   const materialImg = c("honest_materials", "image", "/images/craftsman.png");
   const sideboardImg = c("featured_story", "image", "/images/modern-sideboard.png");
 
+  const handleOpenModal = useCallback((product: Product) => {
+    const vars = variationsByProduct.get(product.id);
+    setModalData({
+      product,
+      variations: {
+        colorOptions: vars?.color ?? [],
+        sizeOptions: vars?.size ?? [],
+      },
+    });
+  }, [variationsByProduct]);
+
+  const handleCloseModal = useCallback(() => setModalData(null), []);
+
   if (loading && products.length === 0) {
     return (
       <div className="animate-pulse space-y-8">
@@ -172,7 +222,12 @@ export function HomePage() {
             {c("hero", "description", "Discover the harmony between form and living craft. Every piece is designed to bring a sense of quiet permanence to your contemporary sanctuary.")}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <button type="button" className="primary-btn" id="hero-explore-btn">
+            <button
+              type="button"
+              className="primary-btn"
+              id="hero-explore-btn"
+              onClick={() => onNavigate?.("Collections")}
+            >
               {c("hero", "btn1_label", "Explore the Collection")}
             </button>
             <button type="button" className="secondary-btn" id="hero-story-btn">
@@ -222,7 +277,7 @@ export function HomePage() {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {curatorPicks.map((product) =>
             product ? (
-              <MiniCard key={product.id} product={product} cta="Quick Shop" />
+              <MiniCard key={product.id} product={product} cta="Quick Shop" onOpenModal={handleOpenModal as any} />
             ) : null,
           )}
         </div>
@@ -246,7 +301,11 @@ export function HomePage() {
           <p className="mt-4 max-w-lg text-[13px] leading-[1.7] text-[var(--text-mid)]">
             {c("honest_materials", "description2", "Every piece at Furniture Odyssey is crafted to ensure the finest for us, preserving all of nature\u0027s warmth for your home\u0027s next chapter.")}
           </p>
-          <button type="button" className="text-link mt-6 block">
+          <button
+            type="button"
+            className="text-link mt-6 block"
+            onClick={() => onNavigate?.("Collections")}
+          >
             {c("honest_materials", "btn_label", "Browse the Craftsmanship →")}
           </button>
         </div>
@@ -284,11 +343,18 @@ export function HomePage() {
           <p className="mt-4 max-w-lg text-[14px] leading-[1.7] text-[var(--text-mid)]">
             {c("featured_story", "description", "Follow the journey of a single slab of oak as it transforms from raw timber into a dining table designed to last for generations.")}
           </p>
-          <button type="button" className="text-link mt-5 block">
+          <button
+            type="button"
+            className="text-link mt-5 block"
+            onClick={() => onNavigate?.("Collections")}
+          >
             {c("featured_story", "btn_label", "Read the Story →")}
           </button>
         </div>
       </section>
+
+      {/* Product Modal */}
+      <ProductModal data={modalData} onClose={handleCloseModal} />
     </>
   );
 }

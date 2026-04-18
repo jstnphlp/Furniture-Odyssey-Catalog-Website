@@ -7,6 +7,7 @@ interface MiniCardProps {
   badgeTone?: 'teal' | 'warm' | 'dark'
   cta?: string
   showPrice?: boolean
+  onOpenModal?: (product: Product | CustomizableTable) => void
 }
 
 export function MiniCard({
@@ -15,12 +16,21 @@ export function MiniCard({
   badgeTone = 'teal',
   cta = 'Quick Shop',
   showPrice = true,
+  onOpenModal,
 }: MiniCardProps) {
   const displayBadge = badge ?? product.badge
   const displayTone = badge ? badgeTone : product.badgeTone ?? badgeTone
 
+  const handleClick = () => {
+    if (onOpenModal) onOpenModal(product)
+  }
+
   return (
-    <article className="warm-card group" id={`card-${product.id}`}>
+    <article
+      className={`warm-card group ${onOpenModal ? 'cursor-pointer' : ''}`}
+      id={`card-${product.id}`}
+      onClick={handleClick}
+    >
       <div className="relative overflow-hidden rounded-xl">
         <img
           src={product.image}
@@ -50,7 +60,11 @@ export function MiniCard({
             </p>
           )}
         </div>
-        <button type="button" className="text-link mt-1">
+        <button
+          type="button"
+          className="text-link mt-1"
+          onClick={(e) => { e.stopPropagation(); handleClick(); }}
+        >
           {product.isCustomizable ? 'Configure →' : `${cta} →`}
         </button>
       </div>

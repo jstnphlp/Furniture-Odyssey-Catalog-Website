@@ -22,8 +22,10 @@ function App() {
     }
   }, [page, isAuthenticated])
 
-  /* Show footer on Home and Collections pages */
-  const showFooter = page === 'Home' || page === 'Collections'
+  /* Reset scroll to top on page change */
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [page])
 
   return (
     <div className="min-h-screen bg-[var(--bg-cream)] text-[var(--text-dark)]">
@@ -34,14 +36,14 @@ function App() {
       />
 
       <main className="container space-y-24 py-12">
-        {page === 'Home' && <HomePage />}
+        {page === 'Home' && <HomePage onNavigate={setPage} />}
         {page === 'Chairs' && <ChairsPage />}
         {page === 'Tables' && <TablesPage />}
         {page === 'Collections' && <CollectionsPage />}
         {page === 'Admin' && isAuthenticated && <AdminPage />}
       </main>
 
-      {showFooter && <SiteFooter brandName={brandName} />}
+      <SiteFooter brandName={brandName} onNavigate={setPage} />
 
       {/* Admin login modal — always mounted, visibility from store */}
       <AdminLoginModal />

@@ -1,9 +1,13 @@
+import type { PageKey } from './SiteNav';
+
 interface SiteFooterProps {
   brandName?: string;
+  onNavigate: (page: PageKey) => void;
 }
 
 export function SiteFooter({
   brandName = "Furniture Odyssey",
+  onNavigate,
 }: SiteFooterProps) {
   return (
     <footer
@@ -13,9 +17,12 @@ export function SiteFooter({
       <div className="container grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
         {/* Col 1: Brand */}
         <div>
-          <p className="font-display text-xl text-[var(--text-dark)]">
+          <button
+            onClick={() => onNavigate('Home')}
+            className="font-display text-xl text-[var(--text-dark)] hover:opacity-75 transition-opacity"
+          >
             {brandName}
-          </p>
+          </button>
           <p className="mt-3 text-[13px] leading-relaxed text-[var(--text-mid)]">
             Quiet permanence for contemporary sanctuaries.
           </p>
@@ -24,28 +31,40 @@ export function SiteFooter({
         {/* Col 2: Shop */}
         <div className="space-y-2 text-[13px] text-[var(--text-mid)]">
           <p className="font-semibold text-[var(--text-dark)]">Shop</p>
-          <p className="cursor-pointer transition hover:text-[var(--text-dark)]">
-            Living Room
-          </p>
-          <p className="cursor-pointer transition hover:text-[var(--text-dark)]">
-            Dining Space
-          </p>
-          <p className="cursor-pointer transition hover:text-[var(--text-dark)]">
-            Foundations
-          </p>
+          <button
+            onClick={() => onNavigate('Chairs')}
+            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+          >
+            Chairs
+          </button>
+          <button
+            onClick={() => onNavigate('Tables')}
+            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+          >
+            Tables
+          </button>
+          <button
+            onClick={() => onNavigate('Collections')}
+            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+          >
+            Collections
+          </button>
         </div>
 
         {/* Col 3: Company */}
         <div className="space-y-2 text-[13px] text-[var(--text-mid)]">
           <p className="font-semibold text-[var(--text-dark)]">Company</p>
+          <button
+            onClick={() => onNavigate('Home')}
+            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+          >
+            Home
+          </button>
           <p className="cursor-pointer transition hover:text-[var(--text-dark)]">
             Our Story
           </p>
           <p className="cursor-pointer transition hover:text-[var(--text-dark)]">
             The Workshop
-          </p>
-          <p className="cursor-pointer transition hover:text-[var(--text-dark)]">
-            Care Guide
           </p>
         </div>
 

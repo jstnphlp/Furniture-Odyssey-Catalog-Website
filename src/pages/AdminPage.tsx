@@ -171,6 +171,262 @@ type Tab = "prices" | "availability" | "content";
 type ContentPage = "home" | "chairs" | "tables" | "collections";
 
 /* ═══════════════════════════════════════════════════════
+   Variation Editor — reusable Color/Size option manager
+   ═══════════════════════════════════════════════════════ */
+
+interface VariationEntry {
+  tempId: string;
+  name: string;
+  priceModifier: string;
+  layerUrl: string;
+  imageFile: File | null;
+}
+
+interface VariationState {
+  enableColors: boolean;
+  enableSizes: boolean;
+  colors: VariationEntry[];
+  sizes: VariationEntry[];
+}
+
+const emptyVariationState: VariationState = {
+  enableColors: false,
+  enableSizes: false,
+  colors: [],
+  sizes: [],
+};
+
+function makeEntry(): VariationEntry {
+  return {
+    tempId: `ve-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    name: "",
+    priceModifier: "0",
+    layerUrl: "",
+    imageFile: null,
+  };
+}
+
+function VariationEditor({
+  state,
+  onChange,
+}: {
+  state: VariationState;
+  onChange: (next: VariationState) => void;
+}) {
+  const update = (partial: Partial<VariationState>) =>
+    onChange({ ...state, ...partial });
+
+  const updateColor = (idx: number, patch: Partial<VariationEntry>) => {
+    const next = [...state.colors];
+    next[idx] = { ...next[idx], ...patch };
+    update({ colors: next });
+  };
+
+  const updateSize = (idx: number, patch: Partial<VariationEntry>) => {
+    const next = [...state.sizes];
+    next[idx] = { ...next[idx], ...patch };
+    update({ sizes: next });
+  };
+
+  return (
+    <div className="space-y-4 rounded-xl border border-[var(--border-card)] bg-[#faf7f3] p-4">
+      <h4 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dark)]">
+        🎨 Product Variations
+      </h4>
+
+      {/* ── Color Toggle ── */}
+      <div className="flex items-center justify-between rounded-lg border border-[var(--border-card)] bg-white p-3">
+        <div>
+          <p className="text-[12px] font-semibold text-[var(--text-dark)]">
+            Enable Color Variations
+          </p>
+          <p className="text-[10px] text-[var(--text-mid)]">
+            Add color options with optional images and price modifiers
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !state.enableColors;
+            update({
+              enableColors: next,
+              colors: next && state.colors.length === 0 ? [makeEntry()] : state.colors,
+            });
+          }}
+          className={`relative h-6 w-10 rounded-full transition-colors ${
+            state.enableColors ? "bg-green-500" : "bg-gray-300"
+          }`}
+        >
+          <span
+            className={`absolute top-[2px] h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              state.enableColors ? "left-[18px]" : "left-[2px]"
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* ── Color Entries ── */}
+      {state.enableColors && (
+        <div className="space-y-2 pl-2">
+          {state.colors.map((entry, idx) => (
+            <div
+              key={entry.tempId}
+              className="flex flex-wrap items-start gap-2 rounded-lg border border-[var(--border-card)] bg-white p-3"
+            >
+              <div className="flex-1 min-w-[120px]">
+                <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Color Name
+                </label>
+                <input
+                  type="text"
+                  value={entry.name}
+                  onChange={(e) => updateColor(idx, { name: e.target.value })}
+                  placeholder="e.g. White Oak"
+                  className="w-full rounded-md border border-[var(--border-card)] bg-white px-2 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div className="w-[100px]">
+                <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  + Price
+                </label>
+                <input
+                  type="number"
+                  value={entry.priceModifier}
+                  onChange={(e) => updateColor(idx, { priceModifier: e.target.value })}
+                  className="w-full rounded-md border border-[var(--border-card)] bg-white px-2 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]"
+                  min="0"
+                />
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Color Image
+                </label>
+                <div className="flex items-center gap-2">
+                  {/* Thumbnail */}
+                  {(entry.imageFile || entry.layerUrl) && (
+                    <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded border border-[var(--border-card)]">
+                      <img
+                        src={entry.imageFile ? URL.createObjectURL(entry.imageFile) : entry.layerUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => updateColor(idx, { imageFile: e.target.files?.[0] ?? null })}
+                    className="w-full rounded-md border border-[var(--border-card)] bg-white px-2 py-1 text-[10px] outline-none"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => update({ colors: state.colors.filter((_, i) => i !== idx) })}
+                className="mt-4 text-[11px] font-bold text-red-500 hover:text-red-700"
+                title="Remove"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => update({ colors: [...state.colors, makeEntry()] })}
+            className="rounded-md border border-dashed border-[var(--border-warm)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-mid)] transition hover:bg-white hover:text-[var(--text-dark)]"
+          >
+            + Add Color Option
+          </button>
+        </div>
+      )}
+
+      {/* ── Size Toggle ── */}
+      <div className="flex items-center justify-between rounded-lg border border-[var(--border-card)] bg-white p-3">
+        <div>
+          <p className="text-[12px] font-semibold text-[var(--text-dark)]">
+            Enable Size Variations
+          </p>
+          <p className="text-[10px] text-[var(--text-mid)]">
+            Add size options (e.g. Small, Medium, Large)
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !state.enableSizes;
+            update({
+              enableSizes: next,
+              sizes: next && state.sizes.length === 0 ? [makeEntry()] : state.sizes,
+            });
+          }}
+          className={`relative h-6 w-10 rounded-full transition-colors ${
+            state.enableSizes ? "bg-green-500" : "bg-gray-300"
+          }`}
+        >
+          <span
+            className={`absolute top-[2px] h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              state.enableSizes ? "left-[18px]" : "left-[2px]"
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* ── Size Entries ── */}
+      {state.enableSizes && (
+        <div className="space-y-2 pl-2">
+          {state.sizes.map((entry, idx) => (
+            <div
+              key={entry.tempId}
+              className="flex items-center gap-2 rounded-lg border border-[var(--border-card)] bg-white p-3"
+            >
+              <div className="flex-1">
+                <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  Size Name
+                </label>
+                <input
+                  type="text"
+                  value={entry.name}
+                  onChange={(e) => updateSize(idx, { name: e.target.value })}
+                  placeholder="e.g. 120cm"
+                  className="w-full rounded-md border border-[var(--border-card)] bg-white px-2 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div className="w-[100px]">
+                <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                  + Price
+                </label>
+                <input
+                  type="number"
+                  value={entry.priceModifier}
+                  onChange={(e) => updateSize(idx, { priceModifier: e.target.value })}
+                  className="w-full rounded-md border border-[var(--border-card)] bg-white px-2 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]"
+                  min="0"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => update({ sizes: state.sizes.filter((_, i) => i !== idx) })}
+                className="mt-4 text-[11px] font-bold text-red-500 hover:text-red-700"
+                title="Remove"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => update({ sizes: [...state.sizes, makeEntry()] })}
+            className="rounded-md border border-dashed border-[var(--border-warm)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-mid)] transition hover:bg-white hover:text-[var(--text-dark)]"
+          >
+            + Add Size Option
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    Section Field Editor — reusable inline field editor
    ═══════════════════════════════════════════════════════ */
 
@@ -416,6 +672,8 @@ function ProductListSection({
   editImageFile,
   setEditImageFile,
   editImageUploading,
+  editVariations,
+  setEditVariations,
 }: {
   category: "Chairs" | "Tables" | "Collections";
   products: (Product | CustomizableTable)[];
@@ -434,6 +692,8 @@ function ProductListSection({
   editImageFile: File | null;
   setEditImageFile: (f: File | null) => void;
   editImageUploading: boolean;
+  editVariations: VariationState;
+  setEditVariations: (v: VariationState) => void;
 }) {
   const filtered = products.filter((p) => p.category === category);
 
@@ -651,6 +911,10 @@ function ProductListSection({
                     />
                   </div>
                 </div>
+
+                {/* Variation Editor */}
+                <VariationEditor state={editVariations} onChange={setEditVariations} />
+
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -736,6 +1000,8 @@ export function AdminPage() {
   const [saveFlash, setSaveFlash] = useState<string | null>(null);
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImageUploading, setEditImageUploading] = useState(false);
+  const [editVariations, setEditVariations] = useState<VariationState>(emptyVariationState);
+  const [newProductVariations, setNewProductVariations] = useState<VariationState>(emptyVariationState);
 
   const configurableTables = useMemo(
     () => products.filter(isCustomizableTable) as CustomizableTable[],
@@ -857,7 +1123,7 @@ export function AdminPage() {
     setTimeout(() => setSaveFlash(null), 1200);
   };
 
-  const startEditing = (p: Product | CustomizableTable) => {
+  const startEditing = async (p: Product | CustomizableTable) => {
     setEditingProduct(p.id);
     setEditImageFile(null);
     setFormState({
@@ -865,6 +1131,35 @@ export function AdminPage() {
       description: p.description ?? "",
       dimensions: p.dimensions ?? "",
       basePrice: String(p.basePrice),
+    });
+
+    // Load existing Color/Size variations for this product
+    const { data: existingOpts } = await supabase
+      .from("table_options")
+      .select("*")
+      .eq("product_id", p.id)
+      .in("option_group", ["Color", "Size"])
+      .order("created_at", { ascending: true });
+
+    const colors: VariationEntry[] = [];
+    const sizes: VariationEntry[] = [];
+    for (const opt of existingOpts ?? []) {
+      const entry: VariationEntry = {
+        tempId: opt.id,
+        name: opt.name,
+        priceModifier: String(opt.price_modifier ?? 0),
+        layerUrl: opt.layer_url ?? "",
+        imageFile: null,
+      };
+      if (opt.option_group === "Color") colors.push(entry);
+      else if (opt.option_group === "Size") sizes.push(entry);
+    }
+
+    setEditVariations({
+      enableColors: colors.length > 0,
+      enableSizes: sizes.length > 0,
+      colors,
+      sizes,
     });
   };
 
@@ -935,10 +1230,88 @@ export function AdminPage() {
       basePrice: nextBasePrice,
       image: imageUrl,
     });
+    // ── Save variations ──
+    await saveVariationsForProduct(editingProduct, editVariations);
+
     flash(editingProduct);
     setEditingProduct(null);
     setEditImageFile(null);
+    setEditVariations(emptyVariationState);
     setSavingProductId(null);
+  };
+
+  /** Upload variation color images and upsert all Color/Size options */
+  const saveVariationsForProduct = async (
+    productId: string,
+    vars: VariationState,
+  ) => {
+    // Delete existing Color/Size options for this product
+    await supabase
+      .from("table_options")
+      .delete()
+      .eq("product_id", productId)
+      .in("option_group", ["Color", "Size"]);
+
+    const rows: any[] = [];
+
+    // Process colors
+    if (vars.enableColors) {
+      for (const entry of vars.colors) {
+        if (!entry.name.trim()) continue;
+        let layerUrl = entry.layerUrl;
+
+        // Upload new image if provided
+        if (entry.imageFile) {
+          const fileExt = entry.imageFile.name.split(".").pop();
+          const fileName = `var-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const { error: uploadErr } = await supabase.storage
+            .from("product-images")
+            .upload(fileName, entry.imageFile);
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage
+              .from("product-images")
+              .getPublicUrl(fileName);
+            layerUrl = urlData.publicUrl;
+          }
+        }
+
+        rows.push({
+          id: `opt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          product_id: productId,
+          option_group: "Color",
+          name: entry.name.trim(),
+          price_modifier: Number(entry.priceModifier) || 0,
+          layer_url: layerUrl || "",
+          available: true,
+        });
+      }
+    }
+
+    // Process sizes
+    if (vars.enableSizes) {
+      for (const entry of vars.sizes) {
+        if (!entry.name.trim()) continue;
+        rows.push({
+          id: `opt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          product_id: productId,
+          option_group: "Size",
+          name: entry.name.trim(),
+          price_modifier: Number(entry.priceModifier) || 0,
+          layer_url: "",
+          available: true,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      const { error: insertErr } = await supabase
+        .from("table_options")
+        .insert(rows);
+      if (insertErr) {
+        console.error("Failed to save variations:", insertErr.message);
+        alert(`Warning: product saved but variations failed: ${insertErr.message}`);
+      }
+    }
   };
 
   const handleDeleteProduct = async (p: Product | CustomizableTable) => {
@@ -1072,6 +1445,9 @@ export function AdminPage() {
         isHomepageFeatured: false,
       });
 
+      // Save variations for the new product
+      await saveVariationsForProduct(newId, newProductVariations);
+
       setNewProductState({
         name: "",
         description: "",
@@ -1080,6 +1456,7 @@ export function AdminPage() {
         category: "Chairs",
         imageFile: null,
       });
+      setNewProductVariations(emptyVariationState);
       setIsAddingProduct(false);
       flash(newId);
     } catch (err: any) {
@@ -1319,6 +1696,10 @@ export function AdminPage() {
             className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
           />
         </div>
+
+        {/* Variation Editor for new product */}
+        <VariationEditor state={newProductVariations} onChange={setNewProductVariations} />
+
         <div className="flex gap-2 pt-2">
           <button
             type="button"
@@ -1903,6 +2284,8 @@ export function AdminPage() {
                   editImageFile={editImageFile}
                   setEditImageFile={setEditImageFile}
                   editImageUploading={editImageUploading}
+                  editVariations={editVariations}
+                  setEditVariations={setEditVariations}
                 />
               </SectionCard>
             </div>
@@ -2025,6 +2408,8 @@ export function AdminPage() {
                   editImageFile={editImageFile}
                   setEditImageFile={setEditImageFile}
                   editImageUploading={editImageUploading}
+                  editVariations={editVariations}
+                  setEditVariations={setEditVariations}
                 />
               </SectionCard>
             </div>
@@ -2115,6 +2500,8 @@ export function AdminPage() {
                   editImageFile={editImageFile}
                   setEditImageFile={setEditImageFile}
                   editImageUploading={editImageUploading}
+                  editVariations={editVariations}
+                  setEditVariations={setEditVariations}
                 />
               </SectionCard>
             </div>

@@ -1,5 +1,9 @@
 export type ProductCategory = 'Chairs' | 'Tables' | 'Collections'
 
+export type VariationGroup = 'Color' | 'Size'
+export type OptionGroupLegacy = 'Top' | 'Legs' | 'Base'
+export type OptionGroup = OptionGroupLegacy | VariationGroup
+
 export interface Product {
   id: string
   name: string
@@ -34,6 +38,12 @@ export interface CustomizableTable extends Product {
     Legs: TableOption[]
     Base: TableOption[]
   }
+}
+
+/** A product with optional Color and/or Size variations */
+export interface ProductVariations {
+  colorOptions: TableOption[]
+  sizeOptions: TableOption[]
 }
 
 export const isCustomizableTable = (
