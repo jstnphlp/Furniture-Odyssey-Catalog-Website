@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../lib/client";
 import { useAdminStore } from "../stores/useAdminStore";
 import { useCatalogStore } from "../stores/useCatalogStore";
+import { usePageContentStore } from "../stores/usePageContentStore";
 import { isCustomizableTable } from "../types/catalog";
 import type { Product, CustomizableTable, TableOption } from "../types/catalog";
 
@@ -167,6 +168,522 @@ const STATIC_IMAGE_SEED_PRODUCTS = [
 ];
 
 type Tab = "prices" | "availability" | "content";
+type ContentPage = "home" | "chairs" | "tables" | "collections";
+
+/* ═══════════════════════════════════════════════════════
+   Section Field Editor — reusable inline field editor
+   ═══════════════════════════════════════════════════════ */
+
+function SectionFieldEditor({
+  label,
+  hint,
+  value,
+  type = "text",
+  onSave,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  type?: "text" | "textarea";
+  onSave: (value: string) => Promise<boolean>;
+}) {
+  const [localValue, setLocalValue] = useState(value);
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const dirty = localValue !== value;
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const ok = await onSave(localValue);
+    setSaving(false);
+    if (ok) {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 1200);
+    }
+  };
+
+  return (
+    <div
+      className={`rounded-lg border p-3 transition ${
+        flash
+          ? "border-green-400 bg-green-50"
+          : "border-[var(--border-card)] bg-white"
+      }`}
+    >
+      <div className="mb-1.5 flex items-center gap-2">
+        <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-mid)]">
+          {label}
+        </label>
+        {hint && (
+          <span className="text-[10px] text-[var(--text-mid)] opacity-60">
+            — {hint}
+          </span>
+        )}
+      </div>
+      {type === "textarea" ? (
+        <textarea
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          rows={3}
+          className="w-full resize-none rounded-lg border border-[var(--border-card)] bg-[var(--bg-cream)] px-3 py-2 text-[13px] leading-relaxed text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+        />
+      ) : (
+        <input
+          type="text"
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          className="w-full rounded-lg border border-[var(--border-card)] bg-[var(--bg-cream)] px-3 py-2 text-[13px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+        />
+      )}
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => { void handleSave(); }}
+          disabled={saving}
+          className="mt-2 rounded-md bg-green-600 px-3 py-1 text-[11px] font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section Image Editor — image preview + upload
+   ═══════════════════════════════════════════════════════ */
+
+function SectionImageEditor({
+  label,
+  hint,
+  currentUrl,
+  onSave,
+}: {
+  label: string;
+  hint?: string;
+  currentUrl: string;
+  onSave: (url: string) => Promise<boolean>;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(currentUrl);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadImage = usePageContentStore((s) => s.uploadImage);
+
+  useEffect(() => {
+    setPreviewUrl(currentUrl);
+  }, [currentUrl]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const url = await uploadImage(file);
+    if (url) {
+      setPreviewUrl(url);
+      const ok = await onSave(url);
+      if (ok) {
+        setFlash(true);
+        setTimeout(() => setFlash(false), 1200);
+      }
+    } else {
+      alert("Failed to upload image.");
+    }
+    setUploading(false);
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  return (
+    <div
+      className={`rounded-lg border p-3 transition ${
+        flash
+          ? "border-green-400 bg-green-50"
+          : "border-[var(--border-card)] bg-white"
+      }`}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-mid)]">
+          {label}
+        </label>
+        {hint && (
+          <span className="text-[10px] text-[var(--text-mid)] opacity-60">
+            — {hint}
+          </span>
+        )}
+      </div>
+      <div className="flex items-start gap-4">
+        {/* Thumbnail */}
+        <div className="h-[80px] w-[120px] flex-shrink-0 overflow-hidden rounded-lg border border-[var(--border-card)] bg-[var(--bg-cream)]">
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt={label}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[10px] text-[var(--text-mid)]">
+              No image
+            </div>
+          )}
+        </div>
+        <div className="flex-1">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => { void handleFileChange(e); }}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="rounded-md border border-[var(--border-card)] bg-[var(--bg-cream)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-dark)] transition hover:bg-[var(--border-warm)] disabled:opacity-50"
+          >
+            {uploading ? "Uploading..." : "Change Image"}
+          </button>
+          <p className="mt-1 text-[10px] text-[var(--text-mid)]">
+            JPG, PNG, WebP. Max 5MB.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section Card — groups fields under a section header
+   ═══════════════════════════════════════════════════════ */
+
+function SectionCard({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] overflow-hidden">
+      {/* Section header */}
+      <div className="border-b border-[var(--border-card)] bg-gradient-to-r from-[#f5ede4] to-[var(--bg-card)] px-5 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[18px]">{icon}</span>
+          <h3 className="font-display text-[18px] text-[var(--text-dark)]">
+            {title}
+          </h3>
+        </div>
+        {description && (
+          <p className="mt-0.5 text-[11px] text-[var(--text-mid)]">
+            {description}
+          </p>
+        )}
+      </div>
+      {/* Fields */}
+      <div className="space-y-3 p-5">{children}</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   Product List — filtered by category, with edit/delete
+   ═══════════════════════════════════════════════════════ */
+
+function ProductListSection({
+  category,
+  products,
+  editingProduct,
+  formState,
+  setFormState,
+  savingProductId,
+  deletingProductId,
+  saveFlash,
+  onStartEditing,
+  onSaveEditing,
+  onCancelEditing,
+  onDeleteProduct,
+  onToggleHomepageFeature,
+  isHomepageFeatured,
+  editImageFile,
+  setEditImageFile,
+  editImageUploading,
+}: {
+  category: "Chairs" | "Tables" | "Collections";
+  products: (Product | CustomizableTable)[];
+  editingProduct: string | null;
+  formState: { name: string; description: string; dimensions: string; basePrice: string };
+  setFormState: React.Dispatch<React.SetStateAction<{ name: string; description: string; dimensions: string; basePrice: string }>>;
+  savingProductId: string | null;
+  deletingProductId: string | null;
+  saveFlash: string | null;
+  onStartEditing: (p: Product | CustomizableTable) => void;
+  onSaveEditing: () => Promise<void>;
+  onCancelEditing: () => void;
+  onDeleteProduct: (p: Product | CustomizableTable) => Promise<void>;
+  onToggleHomepageFeature: (p: Product | CustomizableTable) => Promise<void>;
+  isHomepageFeatured: (p: Product | CustomizableTable) => boolean;
+  editImageFile: File | null;
+  setEditImageFile: (f: File | null) => void;
+  editImageUploading: boolean;
+}) {
+  const filtered = products.filter((p) => p.category === category);
+
+  if (filtered.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-[var(--border-warm)] p-6 text-center">
+        <p className="text-[13px] text-[var(--text-mid)]">
+          No {category.toLowerCase()} products yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {filtered.map((p) => {
+        const isEditing = editingProduct === p.id;
+        return (
+          <div
+            key={p.id}
+            className={`rounded-xl border bg-[var(--bg-card)] p-5 transition ${
+              saveFlash === p.id
+                ? "border-green-400 bg-green-50"
+                : "border-[var(--border-card)]"
+            }`}
+          >
+            {!isEditing ? (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1">
+                    {/* Product thumbnail */}
+                    {p.image && (
+                      <div className="h-[56px] w-[56px] flex-shrink-0 overflow-hidden rounded-lg border border-[var(--border-card)]">
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[16px] font-semibold text-[var(--text-dark)]">
+                          {p.name}
+                        </h3>
+                        {p.isCustomizable && (
+                          <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-bold text-white">
+                            CONFIGURABLE
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[13px] text-[var(--text-mid)]">
+                        {p.description || "No description"}
+                      </p>
+                      <div className="mt-2 flex gap-4 text-[12px] text-[var(--text-mid)]">
+                        <span>₱{p.basePrice.toLocaleString()}</span>
+                        {p.dimensions && <span>📐 {p.dimensions}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onStartEditing(p)}
+                      className="secondary-btn shrink-0 text-[12px]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void onDeleteProduct(p);
+                      }}
+                      disabled={deletingProductId === p.id}
+                      className="text-red-500 hover:text-red-700 text-[11px] font-bold uppercase tracking-wider text-right"
+                    >
+                      {deletingProductId === p.id
+                        ? "Deleting..."
+                        : "Delete"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--border-card)] bg-white p-3">
+                  <div>
+                    <p className="text-[12px] font-semibold text-[var(--text-dark)]">
+                      Feature on Homepage
+                    </p>
+                    <p className="text-[11px] text-[var(--text-mid)]">
+                      Show this product in "The Digital Curator's Pick"
+                      section.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void onToggleHomepageFeature(p);
+                    }}
+                    className={`relative h-6 w-10 rounded-full transition-colors ${
+                      isHomepageFeatured(p) ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-[2px] h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        isHomepageFeatured(p) ? "left-[18px]" : "left-[2px]"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                {/* Image preview & change */}
+                <div className="flex items-start gap-4">
+                  <div className="h-[80px] w-[80px] flex-shrink-0 overflow-hidden rounded-lg border border-[var(--border-card)] bg-[var(--bg-cream)]">
+                    {p.image ? (
+                      <img
+                        src={editImageFile ? URL.createObjectURL(editImageFile) : p.image}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px] text-[var(--text-mid)]">
+                        No image
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                      Product Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setEditImageFile(e.target.files ? e.target.files[0] : null)
+                      }
+                      className="w-full rounded-lg border bg-white px-3 py-1.5 text-[12px] outline-none"
+                    />
+                    {editImageFile && (
+                      <p className="mt-1 text-[10px] text-green-600 font-semibold">
+                        New image selected — will upload on save
+                      </p>
+                    )}
+                    {editImageUploading && (
+                      <p className="mt-1 text-[10px] text-amber-600 font-semibold">
+                        Uploading image...
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formState.name}
+                    onChange={(e) =>
+                      setFormState((s) => ({ ...s, name: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[14px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                    Description
+                  </label>
+                  <textarea
+                    value={formState.description}
+                    onChange={(e) =>
+                      setFormState((s) => ({
+                        ...s,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                    className="w-full resize-none rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                      Dimensions
+                    </label>
+                    <input
+                      type="text"
+                      value={formState.dimensions}
+                      onChange={(e) =>
+                        setFormState((s) => ({
+                          ...s,
+                          dimensions: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. 220W × 95D × 76H cm"
+                      className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[13px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+                      Base Price (₱)
+                    </label>
+                    <input
+                      type="number"
+                      value={formState.basePrice}
+                      onChange={(e) =>
+                        setFormState((s) => ({
+                          ...s,
+                          basePrice: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[13px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+                      min="0"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void onSaveEditing();
+                    }}
+                    disabled={savingProductId === p.id || editImageUploading}
+                    className="primary-btn text-[12px]"
+                  >
+                    {savingProductId === p.id
+                      ? "Saving..."
+                      : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancelEditing}
+                    className="secondary-btn text-[12px]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   MAIN ADMIN PAGE
+   ═══════════════════════════════════════════════════════ */
 
 export function AdminPage() {
   const adminEmail = useAdminStore((s) => s.adminEmail);
@@ -177,6 +694,11 @@ export function AdminPage() {
   const removeProduct = useCatalogStore((s) => s.removeProduct);
   const updateProduct = useCatalogStore((s) => s.updateProduct);
   const updateTableOption = useCatalogStore((s) => s.updateTableOption);
+
+  // Page content store
+  const pageContent = usePageContentStore();
+  const getField = pageContent.getField;
+  const updateField = pageContent.updateField;
 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -199,6 +721,7 @@ export function AdminPage() {
   });
 
   const [activeTab, setActiveTab] = useState<Tab>("prices");
+  const [contentPage, setContentPage] = useState<ContentPage>("home");
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [formState, setFormState] = useState<{
     name: string;
@@ -211,6 +734,8 @@ export function AdminPage() {
     null,
   );
   const [saveFlash, setSaveFlash] = useState<string | null>(null);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImageUploading, setEditImageUploading] = useState(false);
 
   const configurableTables = useMemo(
     () => products.filter(isCustomizableTable) as CustomizableTable[],
@@ -219,6 +744,7 @@ export function AdminPage() {
 
   const allProducts = products;
 
+  // Load catalog
   useEffect(() => {
     let mounted = true;
 
@@ -320,6 +846,12 @@ export function AdminPage() {
     };
   }, [setProducts]);
 
+  // Load page content
+  useEffect(() => {
+    void pageContent.loadContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const flash = (id: string) => {
     setSaveFlash(id);
     setTimeout(() => setSaveFlash(null), 1200);
@@ -327,6 +859,7 @@ export function AdminPage() {
 
   const startEditing = (p: Product | CustomizableTable) => {
     setEditingProduct(p.id);
+    setEditImageFile(null);
     setFormState({
       name: p.name,
       description: p.description ?? "",
@@ -343,13 +876,40 @@ export function AdminPage() {
 
     setSavingProductId(editingProduct);
 
+    let imageUrl = productToEdit.image;
+
+    // Upload new image if selected
+    if (editImageFile) {
+      setEditImageUploading(true);
+      const fileExt = editImageFile.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(fileName, editImageFile);
+
+      if (uploadError) {
+        setEditImageUploading(false);
+        setSavingProductId(null);
+        alert(`Failed to upload image: ${uploadError.message}`);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(fileName);
+
+      imageUrl = publicUrlData.publicUrl;
+      setEditImageUploading(false);
+    }
+
     const nextBasePrice = Number(formState.basePrice) || 0;
     const payload = {
       id: productToEdit.id,
       name: formState.name.trim(),
       category: productToEdit.category,
       base_price: nextBasePrice,
-      image: productToEdit.image,
+      image: imageUrl,
       description: formState.description,
       dimensions: formState.dimensions,
       is_customizable: productToEdit.isCustomizable,
@@ -373,9 +933,11 @@ export function AdminPage() {
       description: formState.description,
       dimensions: formState.dimensions,
       basePrice: nextBasePrice,
+      image: imageUrl,
     });
     flash(editingProduct);
     setEditingProduct(null);
+    setEditImageFile(null);
     setSavingProductId(null);
   };
 
@@ -572,7 +1134,7 @@ export function AdminPage() {
     }
   };
 
-  const isHomepageFeatured = (p: Product | CustomizableTable) => {
+  const isHomepageFeaturedFn = (p: Product | CustomizableTable) => {
     const fromFlag = p.isHomepageFeatured ?? false;
     const fromFeatures =
       Array.isArray(p.features) && p.features.includes(HOMEPAGE_FEATURE_MARKER);
@@ -583,11 +1145,11 @@ export function AdminPage() {
     p: Product | CustomizableTable,
   ) => {
     const currentFeatures = Array.isArray(p.features) ? p.features : [];
-    const currentlyFeatured = isHomepageFeatured(p);
+    const currentlyFeatured = isHomepageFeaturedFn(p);
 
     if (!currentlyFeatured) {
       const featuredCount = products.filter((item) =>
-        isHomepageFeatured(item),
+        isHomepageFeaturedFn(item),
       ).length;
       if (featuredCount >= MAX_HOMEPAGE_FEATURED) {
         alert(`You can only feature up to ${MAX_HOMEPAGE_FEATURED} products.`);
@@ -629,6 +1191,154 @@ export function AdminPage() {
     { key: "availability", label: "Availability", icon: "◉" },
     { key: "content", label: "Content", icon: "✎" },
   ];
+
+  const contentPages: { key: ContentPage; label: string; icon: string }[] = [
+    { key: "home", label: "Home", icon: "🏠" },
+    { key: "chairs", label: "Chairs", icon: "🪑" },
+    { key: "tables", label: "Tables", icon: "🪵" },
+    { key: "collections", label: "Collections", icon: "🎨" },
+  ];
+
+  /* Helper to create save handler for content fields */
+  const makeFieldSaver = (page: string, section: string, key: string) => {
+    return async (value: string) => {
+      return await updateField(page, section, key, value);
+    };
+  };
+
+  /* ── Add Product form (used in each page's product section) ── */
+  const renderAddProductForm = (defaultCategory: "Chairs" | "Tables" | "Collections") => {
+    if (!isAddingProduct) return null;
+
+    // Sync category to default when opening
+    if (newProductState.category !== defaultCategory && !newProductState.name) {
+      setNewProductState((s) => ({ ...s, category: defaultCategory }));
+    }
+
+    return (
+      <div className="rounded-xl border border-green-300 bg-green-50/50 p-5 space-y-3">
+        <h3 className="font-display text-[20px] text-green-800">
+          Add New Product
+        </h3>
+        <div>
+          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+            Name
+          </label>
+          <input
+            type="text"
+            value={newProductState.name}
+            onChange={(e) =>
+              setNewProductState((s) => ({ ...s, name: e.target.value }))
+            }
+            className="w-full rounded-lg border bg-white px-3 py-2 text-[14px] outline-none"
+            placeholder="e.g. Modern Sofa"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+            Category
+          </label>
+          <select
+            value={newProductState.category}
+            onChange={(e) =>
+              setNewProductState((s) => ({
+                ...s,
+                category: e.target.value as any,
+              }))
+            }
+            className="w-full rounded-lg border bg-white px-3 py-2 text-[14px] outline-none"
+          >
+            <option value="Chairs">Chairs</option>
+            <option value="Tables">Tables</option>
+            <option value="Collections">Collections</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+            Description
+          </label>
+          <textarea
+            value={newProductState.description}
+            onChange={(e) =>
+              setNewProductState((s) => ({
+                ...s,
+                description: e.target.value,
+              }))
+            }
+            rows={2}
+            className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none resize-none"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+              Dimensions
+            </label>
+            <input
+              type="text"
+              value={newProductState.dimensions}
+              onChange={(e) =>
+                setNewProductState((s) => ({
+                  ...s,
+                  dimensions: e.target.value,
+                }))
+              }
+              className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+              Base Price
+            </label>
+            <input
+              type="number"
+              value={newProductState.basePrice}
+              onChange={(e) =>
+                setNewProductState((s) => ({
+                  ...s,
+                  basePrice: e.target.value,
+                }))
+              }
+              className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+            Image File
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) =>
+              setNewProductState((s) => ({
+                ...s,
+                imageFile: e.target.files ? e.target.files[0] : null,
+              }))
+            }
+            className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
+          />
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => { void handleAddProduct(); }}
+            disabled={isUploading}
+            className="primary-btn text-[12px] bg-green-700 hover:bg-green-800 disabled:opacity-50"
+          >
+            {isUploading ? "Uploading..." : "Save Product"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAddingProduct(false)}
+            className="secondary-btn text-[12px] bg-white"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -872,335 +1582,543 @@ export function AdminPage() {
 
       {/* ═══ TAB: Content Editor ═══ */}
       {activeTab === "content" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] text-[var(--text-mid)]">
-              Edit product name, description, dimensions, and base price.
-            </p>
-            <div className="flex gap-2">
+        <div className="space-y-6">
+          {/* Content sub-navigation */}
+          <div className="flex flex-wrap gap-2">
+            {contentPages.map((cp) => (
               <button
+                key={cp.key}
                 type="button"
-                onClick={handleSeedStaticCatalog}
-                disabled={isSeedingCatalog}
-                className="secondary-btn text-[12px]"
+                onClick={() => {
+                  setContentPage(cp.key);
+                  setIsAddingProduct(false);
+                  setEditingProduct(null);
+                }}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-[13px] font-semibold transition ${
+                  contentPage === cp.key
+                    ? "bg-[var(--text-dark)] text-white shadow-md"
+                    : "bg-white border border-[var(--border-card)] text-[var(--text-mid)] hover:text-[var(--text-dark)] hover:border-[var(--text-dark)]"
+                }`}
               >
-                {isSeedingCatalog
-                  ? "Seeding DB..."
-                  : "Seed Static Images to DB"}
+                <span>{cp.icon}</span>
+                {cp.label}
               </button>
-              <button
-                type="button"
-                onClick={() => setIsAddingProduct(true)}
-                className="primary-btn text-[12px]"
-              >
-                + Add Product
-              </button>
-            </div>
+            ))}
           </div>
 
-          {isAddingProduct && (
-            <div className="rounded-xl border border-green-300 bg-green-50/50 p-5 space-y-3">
-              <h3 className="font-display text-[20px] text-green-800">
-                Add New Product
-              </h3>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={newProductState.name}
-                  onChange={(e) =>
-                    setNewProductState((s) => ({ ...s, name: e.target.value }))
-                  }
-                  className="w-full rounded-lg border bg-white px-3 py-2 text-[14px] outline-none"
-                  placeholder="e.g. Modern Sofa"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                  Category
-                </label>
-                <select
-                  value={newProductState.category}
-                  onChange={(e) =>
-                    setNewProductState((s) => ({
-                      ...s,
-                      category: e.target.value as any,
-                    }))
-                  }
-                  className="w-full rounded-lg border bg-white px-3 py-2 text-[14px] outline-none"
-                >
-                  <option value="Chairs">Chairs</option>
-                  <option value="Tables">Tables</option>
-                  <option value="Collections">Collections</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                  Description
-                </label>
-                <textarea
-                  value={newProductState.description}
-                  onChange={(e) =>
-                    setNewProductState((s) => ({
-                      ...s,
-                      description: e.target.value,
-                    }))
-                  }
-                  rows={2}
-                  className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none resize-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+          {/* Page loading state */}
+          {pageContent.isLoading && (
+            <p className="text-[12px] text-[var(--text-mid)]">
+              Loading page content...
+            </p>
+          )}
+
+          {/* ─── HOME PAGE ─── */}
+          {contentPage === "home" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                    Dimensions
-                  </label>
-                  <input
-                    type="text"
-                    value={newProductState.dimensions}
-                    onChange={(e) =>
-                      setNewProductState((s) => ({
-                        ...s,
-                        dimensions: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
-                  />
+                  <h2 className="font-display text-[24px] text-[var(--text-dark)]">
+                    Home Page Content
+                  </h2>
+                  <p className="text-[12px] text-[var(--text-mid)]">
+                    Configure all text and images on the homepage.
+                  </p>
                 </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                    Base Price
-                  </label>
-                  <input
-                    type="number"
-                    value={newProductState.basePrice}
-                    onChange={(e) =>
-                      setNewProductState((s) => ({
-                        ...s,
-                        basePrice: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                  Image File
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setNewProductState((s) => ({
-                      ...s,
-                      imageFile: e.target.files ? e.target.files[0] : null,
-                    }))
-                  }
-                  className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={handleAddProduct}
-                  disabled={isUploading}
-                  className="primary-btn text-[12px] bg-green-700 hover:bg-green-800 disabled:opacity-50"
+                  onClick={handleSeedStaticCatalog}
+                  disabled={isSeedingCatalog}
+                  className="secondary-btn text-[12px]"
                 >
-                  {isUploading ? "Uploading..." : "Save Product"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingProduct(false)}
-                  className="secondary-btn text-[12px] bg-white"
-                >
-                  Cancel
+                  {isSeedingCatalog
+                    ? "Seeding DB..."
+                    : "Seed Static Images to DB"}
                 </button>
               </div>
+
+              {/* Hero Section */}
+              <SectionCard
+                icon="🎯"
+                title="Hero Section"
+                description="The main landing area visitors see first"
+              >
+                <SectionFieldEditor
+                  label="Eyebrow Text"
+                  hint="Small text above the title"
+                  value={getField("home", "hero", "eyebrow", "A New Way to Sit")}
+                  onSave={makeFieldSaver("home", "hero", "eyebrow")}
+                />
+                <SectionFieldEditor
+                  label="Title"
+                  hint="Main heading text"
+                  value={getField("home", "hero", "title", "Sculpting")}
+                  onSave={makeFieldSaver("home", "hero", "title")}
+                />
+                <SectionFieldEditor
+                  label="Italic Accent"
+                  hint="Styled italic word in the heading"
+                  value={getField("home", "hero", "italic", "Silence")}
+                  onSave={makeFieldSaver("home", "hero", "italic")}
+                />
+                <SectionFieldEditor
+                  label="Description"
+                  hint="Paragraph below the heading"
+                  value={getField("home", "hero", "description", "Discover the harmony between form and living craft. Every piece is designed to bring a sense of quiet permanence to your contemporary sanctuary.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("home", "hero", "description")}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <SectionFieldEditor
+                    label="Button 1 Label"
+                    hint="Primary CTA"
+                    value={getField("home", "hero", "btn1_label", "Explore the Collection")}
+                    onSave={makeFieldSaver("home", "hero", "btn1_label")}
+                  />
+                  <SectionFieldEditor
+                    label="Button 2 Label"
+                    hint="Secondary CTA"
+                    value={getField("home", "hero", "btn2_label", "Our Story")}
+                    onSave={makeFieldSaver("home", "hero", "btn2_label")}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <SectionImageEditor
+                    label="Hero Image 1"
+                    hint="Large background image (right side)"
+                    currentUrl={getField("home", "hero", "image1", "/images/wooden-cabinet.png")}
+                    onSave={makeFieldSaver("home", "hero", "image1")}
+                  />
+                  <SectionImageEditor
+                    label="Hero Image 2"
+                    hint="Small overlapping image (left side)"
+                    currentUrl={getField("home", "hero", "image2", "/images/chair-sage.png")}
+                    onSave={makeFieldSaver("home", "hero", "image2")}
+                  />
+                </div>
+              </SectionCard>
+
+              {/* Curator's Pick */}
+              <SectionCard
+                icon="⭐"
+                title="Curator's Pick Section"
+                description="Featured products grid — toggle products from their cards below"
+              >
+                <SectionFieldEditor
+                  label="Eyebrow Text"
+                  hint="Small text above the section title"
+                  value={getField("home", "curators_pick", "eyebrow", "a daily focus on modern, distinctive classics, handcrafted furniture and more.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("home", "curators_pick", "eyebrow")}
+                />
+                <SectionFieldEditor
+                  label="Section Title"
+                  hint="Heading for the featured products"
+                  value={getField("home", "curators_pick", "title", "The Digital Curator's Pick")}
+                  onSave={makeFieldSaver("home", "curators_pick", "title")}
+                />
+              </SectionCard>
+
+              {/* Honest Materials */}
+              <SectionCard
+                icon="🌿"
+                title="Honest Materials Section"
+                description="Brand story section with image and quote"
+              >
+                <SectionFieldEditor
+                  label="Title"
+                  hint="Main heading text"
+                  value={getField("home", "honest_materials", "title", "Honest Materials.")}
+                  onSave={makeFieldSaver("home", "honest_materials", "title")}
+                />
+                <SectionFieldEditor
+                  label="Italic Accent"
+                  hint="Styled italic text in heading"
+                  value={getField("home", "honest_materials", "italic", "Eternal Design.")}
+                  onSave={makeFieldSaver("home", "honest_materials", "italic")}
+                />
+                <SectionFieldEditor
+                  label="Description"
+                  hint="Primary paragraph"
+                  value={getField("home", "honest_materials", "description", "We believe furniture should tell a story worth repeating. In a world of disposable convenience, our \"Honest Material\" movement — where the wood grain is embraced and the visible construction provides testament to the artisan's touch.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("home", "honest_materials", "description")}
+                />
+                <SectionFieldEditor
+                  label="Secondary Description"
+                  hint="Second paragraph below"
+                  value={getField("home", "honest_materials", "description2", "Every piece at Furniture Odyssey is crafted to ensure the finest for us, preserving all of nature's warmth for your home's next chapter.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("home", "honest_materials", "description2")}
+                />
+                <SectionFieldEditor
+                  label="Button Label"
+                  hint="Link text at the bottom"
+                  value={getField("home", "honest_materials", "btn_label", "Browse the Craftsmanship →")}
+                  onSave={makeFieldSaver("home", "honest_materials", "btn_label")}
+                />
+                <SectionFieldEditor
+                  label="Floating Quote"
+                  hint="Quote card overlaying the image"
+                  value={getField("home", "honest_materials", "quote", "Every grain tells a story of patient hands.")}
+                  onSave={makeFieldSaver("home", "honest_materials", "quote")}
+                />
+                <SectionImageEditor
+                  label="Section Image"
+                  hint="Craftsman/material photo"
+                  currentUrl={getField("home", "honest_materials", "image", "/images/craftsman.png")}
+                  onSave={makeFieldSaver("home", "honest_materials", "image")}
+                />
+              </SectionCard>
+
+              {/* Featured Story */}
+              <SectionCard
+                icon="📖"
+                title="Featured Story Section"
+                description="Bottom editorial with image"
+              >
+                <SectionFieldEditor
+                  label="Eyebrow Text"
+                  hint="Small label above heading"
+                  value={getField("home", "featured_story", "eyebrow", "Featured Story")}
+                  onSave={makeFieldSaver("home", "featured_story", "eyebrow")}
+                />
+                <SectionFieldEditor
+                  label="Title"
+                  hint="Main heading"
+                  value={getField("home", "featured_story", "title", "From Workshop")}
+                  onSave={makeFieldSaver("home", "featured_story", "title")}
+                />
+                <SectionFieldEditor
+                  label="Italic Accent"
+                  hint="Styled italic portion"
+                  value={getField("home", "featured_story", "italic", "to Sanctuary")}
+                  onSave={makeFieldSaver("home", "featured_story", "italic")}
+                />
+                <SectionFieldEditor
+                  label="Description"
+                  hint="Body text"
+                  value={getField("home", "featured_story", "description", "Follow the journey of a single slab of oak as it transforms from raw timber into a dining table designed to last for generations.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("home", "featured_story", "description")}
+                />
+                <SectionFieldEditor
+                  label="Button Label"
+                  hint="Link text"
+                  value={getField("home", "featured_story", "btn_label", "Read the Story →")}
+                  onSave={makeFieldSaver("home", "featured_story", "btn_label")}
+                />
+                <SectionImageEditor
+                  label="Section Image"
+                  hint="Editorial photo (left side)"
+                  currentUrl={getField("home", "featured_story", "image", "/images/modern-sideboard.png")}
+                  onSave={makeFieldSaver("home", "featured_story", "image")}
+                />
+              </SectionCard>
             </div>
           )}
 
-          {allProducts.map((p) => {
-            const isEditing = editingProduct === p.id;
-            return (
-              <div
-                key={p.id}
-                className={`rounded-xl border bg-[var(--bg-card)] p-5 transition ${
-                  saveFlash === p.id
-                    ? "border-green-400 bg-green-50"
-                    : "border-[var(--border-card)]"
-                }`}
-              >
-                {!isEditing ? (
-                  <>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-[16px] font-semibold text-[var(--text-dark)]">
-                            {p.name}
-                          </h3>
-                          <span className="rounded-full bg-[var(--bg-cream)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--text-mid)]">
-                            {p.category}
-                          </span>
-                          {p.isCustomizable && (
-                            <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-bold text-white">
-                              CONFIGURABLE
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-[13px] text-[var(--text-mid)]">
-                          {p.description || "No description"}
-                        </p>
-                        <div className="mt-2 flex gap-4 text-[12px] text-[var(--text-mid)]">
-                          <span>₱{p.basePrice.toLocaleString()}</span>
-                          {p.dimensions && <span>📐 {p.dimensions}</span>}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => startEditing(p)}
-                          className="secondary-btn shrink-0 text-[12px]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void handleDeleteProduct(p);
-                          }}
-                          disabled={deletingProductId === p.id}
-                          className="text-red-500 hover:text-red-700 text-[11px] font-bold uppercase tracking-wider text-right"
-                        >
-                          {deletingProductId === p.id
-                            ? "Deleting..."
-                            : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--border-card)] bg-white p-3">
-                      <div>
-                        <p className="text-[12px] font-semibold text-[var(--text-dark)]">
-                          Feature on Homepage
-                        </p>
-                        <p className="text-[11px] text-[var(--text-mid)]">
-                          Show this product in "The Digital Curator's Pick"
-                          section.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void handleToggleHomepageFeature(p);
-                        }}
-                        className={`relative h-6 w-10 rounded-full transition-colors ${
-                          isHomepageFeatured(p) ? "bg-green-500" : "bg-gray-300"
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-[2px] h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                            isHomepageFeatured(p) ? "left-[18px]" : "left-[2px]"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                        Name
-                      </label>
-                      <input
-                        type="text"
-                        value={formState.name}
-                        onChange={(e) =>
-                          setFormState((s) => ({ ...s, name: e.target.value }))
-                        }
-                        className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[14px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                        Description
-                      </label>
-                      <textarea
-                        value={formState.description}
-                        onChange={(e) =>
-                          setFormState((s) => ({
-                            ...s,
-                            description: e.target.value,
-                          }))
-                        }
-                        rows={3}
-                        className="w-full resize-none rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                          Dimensions
-                        </label>
-                        <input
-                          type="text"
-                          value={formState.dimensions}
-                          onChange={(e) =>
-                            setFormState((s) => ({
-                              ...s,
-                              dimensions: e.target.value,
-                            }))
-                          }
-                          placeholder="e.g. 220W × 95D × 76H cm"
-                          className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[13px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
-                          Base Price (₱)
-                        </label>
-                        <input
-                          type="number"
-                          value={formState.basePrice}
-                          onChange={(e) =>
-                            setFormState((s) => ({
-                              ...s,
-                              basePrice: e.target.value,
-                            }))
-                          }
-                          className="w-full rounded-lg border border-[var(--border-card)] bg-white px-3 py-2 text-[13px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void saveEditing();
-                        }}
-                        disabled={savingProductId === p.id}
-                        className="primary-btn text-[12px]"
-                      >
-                        {savingProductId === p.id
-                          ? "Saving..."
-                          : "Save Changes"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingProduct(null)}
-                        className="secondary-btn text-[12px]"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+          {/* ─── CHAIRS PAGE ─── */}
+          {contentPage === "chairs" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-display text-[24px] text-[var(--text-dark)]">
+                    Chairs Page Content
+                  </h2>
+                  <p className="text-[12px] text-[var(--text-mid)]">
+                    Configure the chairs page hero and manage chair products.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewProductState((s) => ({ ...s, category: "Chairs" }));
+                    setIsAddingProduct(true);
+                  }}
+                  className="primary-btn text-[12px]"
+                >
+                  + Add Chair
+                </button>
               </div>
-            );
-          })}
+
+              {/* Hero Section */}
+              <SectionCard
+                icon="🎯"
+                title="Hero Section"
+                description="Top area of the chairs page"
+              >
+                <SectionFieldEditor
+                  label="Eyebrow Text"
+                  hint="Small text above title"
+                  value={getField("chairs", "hero", "eyebrow", "The Seat You Deserve")}
+                  onSave={makeFieldSaver("chairs", "hero", "eyebrow")}
+                />
+                <SectionFieldEditor
+                  label="Title"
+                  hint="Main heading"
+                  value={getField("chairs", "hero", "title", "Sculpted")}
+                  onSave={makeFieldSaver("chairs", "hero", "title")}
+                />
+                <SectionFieldEditor
+                  label="Italic Accent"
+                  hint="Styled italic word"
+                  value={getField("chairs", "hero", "italic", "Comfort.")}
+                  onSave={makeFieldSaver("chairs", "hero", "italic")}
+                />
+                <SectionFieldEditor
+                  label="Description"
+                  hint="Paragraph below heading"
+                  value={getField("chairs", "hero", "description", "Discover sculpted silhouettes, classic designs and tactile fabrics — from artisanal studios to your sanctuary. In a chair, every piece is a sanctuary of its own.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("chairs", "hero", "description")}
+                />
+              </SectionCard>
+
+              {/* Products */}
+              <SectionCard
+                icon="🛋️"
+                title="Chair Products"
+                description="All chairs in the catalog"
+              >
+                {renderAddProductForm("Chairs")}
+                <ProductListSection
+                  category="Chairs"
+                  products={allProducts}
+                  editingProduct={editingProduct}
+                  formState={formState}
+                  setFormState={setFormState}
+                  savingProductId={savingProductId}
+                  deletingProductId={deletingProductId}
+                  saveFlash={saveFlash}
+                  onStartEditing={startEditing}
+                  onSaveEditing={saveEditing}
+                  onCancelEditing={() => {
+                    setEditingProduct(null);
+                    setEditImageFile(null);
+                  }}
+                  onDeleteProduct={handleDeleteProduct}
+                  onToggleHomepageFeature={handleToggleHomepageFeature}
+                  isHomepageFeatured={isHomepageFeaturedFn}
+                  editImageFile={editImageFile}
+                  setEditImageFile={setEditImageFile}
+                  editImageUploading={editImageUploading}
+                />
+              </SectionCard>
+            </div>
+          )}
+
+          {/* ─── TABLES PAGE ─── */}
+          {contentPage === "tables" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-display text-[24px] text-[var(--text-dark)]">
+                    Tables Page Content
+                  </h2>
+                  <p className="text-[12px] text-[var(--text-mid)]">
+                    Configure the tables page hero, catalog section, and manage table products.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewProductState((s) => ({ ...s, category: "Tables" }));
+                    setIsAddingProduct(true);
+                  }}
+                  className="primary-btn text-[12px]"
+                >
+                  + Add Table
+                </button>
+              </div>
+
+              {/* Hero Section */}
+              <SectionCard
+                icon="🎯"
+                title="Hero Section"
+                description="Full-width hero with background image and overlay text"
+              >
+                <SectionFieldEditor
+                  label="Eyebrow Text"
+                  hint="Small text above title"
+                  value={getField("tables", "hero", "eyebrow", "The Custom Collection")}
+                  onSave={makeFieldSaver("tables", "hero", "eyebrow")}
+                />
+                <SectionFieldEditor
+                  label="Title"
+                  hint="Main heading"
+                  value={getField("tables", "hero", "title", "Gathering")}
+                  onSave={makeFieldSaver("tables", "hero", "title")}
+                />
+                <SectionFieldEditor
+                  label="Italic Accent"
+                  hint="Styled italic word"
+                  value={getField("tables", "hero", "italic", "Redefined.")}
+                  onSave={makeFieldSaver("tables", "hero", "italic")}
+                />
+                <SectionFieldEditor
+                  label="Description"
+                  hint="Body text overlay"
+                  value={getField("tables", "hero", "description", "Crafted from solid oak and steel married, our tables are built to be the heart of your home. Turn every deliberation to your sanctuary.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("tables", "hero", "description")}
+                />
+                <SectionFieldEditor
+                  label="Button Label"
+                  hint="CTA button on hero"
+                  value={getField("tables", "hero", "btn_label", "Start Gathering")}
+                  onSave={makeFieldSaver("tables", "hero", "btn_label")}
+                />
+                <SectionFieldEditor
+                  label="Floating Quote"
+                  hint="Quote card in bottom-right of hero"
+                  value={getField("tables", "hero", "quote", "Every chair follows a table worth sitting around.")}
+                  onSave={makeFieldSaver("tables", "hero", "quote")}
+                />
+                <SectionImageEditor
+                  label="Hero Background Image"
+                  hint="Full-width background photo"
+                  currentUrl={getField("tables", "hero", "image", "/images/wood-grain.png")}
+                  onSave={makeFieldSaver("tables", "hero", "image")}
+                />
+              </SectionCard>
+
+              {/* Curated Catalog */}
+              <SectionCard
+                icon="📋"
+                title="Curated Catalog Section"
+                description="Section heading above the product grid"
+              >
+                <SectionFieldEditor
+                  label="Section Title"
+                  hint="Heading above the catalog grid"
+                  value={getField("tables", "catalog", "title", "Curated Catalog")}
+                  onSave={makeFieldSaver("tables", "catalog", "title")}
+                />
+              </SectionCard>
+
+              {/* Products */}
+              <SectionCard
+                icon="🪵"
+                title="Table Products"
+                description="All tables in the catalog"
+              >
+                {renderAddProductForm("Tables")}
+                <ProductListSection
+                  category="Tables"
+                  products={allProducts}
+                  editingProduct={editingProduct}
+                  formState={formState}
+                  setFormState={setFormState}
+                  savingProductId={savingProductId}
+                  deletingProductId={deletingProductId}
+                  saveFlash={saveFlash}
+                  onStartEditing={startEditing}
+                  onSaveEditing={saveEditing}
+                  onCancelEditing={() => {
+                    setEditingProduct(null);
+                    setEditImageFile(null);
+                  }}
+                  onDeleteProduct={handleDeleteProduct}
+                  onToggleHomepageFeature={handleToggleHomepageFeature}
+                  isHomepageFeatured={isHomepageFeaturedFn}
+                  editImageFile={editImageFile}
+                  setEditImageFile={setEditImageFile}
+                  editImageUploading={editImageUploading}
+                />
+              </SectionCard>
+            </div>
+          )}
+
+          {/* ─── COLLECTIONS PAGE ─── */}
+          {contentPage === "collections" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-display text-[24px] text-[var(--text-dark)]">
+                    Collections Page Content
+                  </h2>
+                  <p className="text-[12px] text-[var(--text-mid)]">
+                    Configure the collections page hero and manage collection items.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewProductState((s) => ({ ...s, category: "Collections" }));
+                    setIsAddingProduct(true);
+                  }}
+                  className="primary-btn text-[12px]"
+                >
+                  + Add Collection Item
+                </button>
+              </div>
+
+              {/* Hero Section */}
+              <SectionCard
+                icon="🎯"
+                title="Hero Section"
+                description="Top area of the collections page"
+              >
+                <SectionFieldEditor
+                  label="Title"
+                  hint="Main heading"
+                  value={getField("collections", "hero", "title", "Curating Your")}
+                  onSave={makeFieldSaver("collections", "hero", "title")}
+                />
+                <SectionFieldEditor
+                  label="Italic Accent"
+                  hint="Styled italic word"
+                  value={getField("collections", "hero", "italic", "Sanctuary")}
+                  onSave={makeFieldSaver("collections", "hero", "italic")}
+                />
+                <SectionFieldEditor
+                  label="Description"
+                  hint="Body text below heading"
+                  value={getField("collections", "hero", "description", "Explore our latest ensemble of curated finished pieces, designed to bring quiet elegance and enduring warmth. A luxury curation of your home.")}
+                  type="textarea"
+                  onSave={makeFieldSaver("collections", "hero", "description")}
+                />
+                <SectionFieldEditor
+                  label="Button Label"
+                  hint="CTA button"
+                  value={getField("collections", "hero", "btn_label", "View Catalog")}
+                  onSave={makeFieldSaver("collections", "hero", "btn_label")}
+                />
+              </SectionCard>
+
+              {/* Products */}
+              <SectionCard
+                icon="🎨"
+                title="Collection Products"
+                description="All items in the collections catalog"
+              >
+                {renderAddProductForm("Collections")}
+                <ProductListSection
+                  category="Collections"
+                  products={allProducts}
+                  editingProduct={editingProduct}
+                  formState={formState}
+                  setFormState={setFormState}
+                  savingProductId={savingProductId}
+                  deletingProductId={deletingProductId}
+                  saveFlash={saveFlash}
+                  onStartEditing={startEditing}
+                  onSaveEditing={saveEditing}
+                  onCancelEditing={() => {
+                    setEditingProduct(null);
+                    setEditImageFile(null);
+                  }}
+                  onDeleteProduct={handleDeleteProduct}
+                  onToggleHomepageFeature={handleToggleHomepageFeature}
+                  isHomepageFeatured={isHomepageFeaturedFn}
+                  editImageFile={editImageFile}
+                  setEditImageFile={setEditImageFile}
+                  editImageUploading={editImageUploading}
+                />
+              </SectionCard>
+            </div>
+          )}
         </div>
       )}
     </div>
