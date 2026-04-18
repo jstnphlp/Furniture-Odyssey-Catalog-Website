@@ -8,12 +8,20 @@ import { TablesPage } from './pages/TablesPage'
 import { CollectionsPage } from './pages/CollectionsPage'
 import { AdminPage } from './pages/AdminPage'
 import { useAdminStore } from './stores/useAdminStore'
+import { usePageContentStore } from './stores/usePageContentStore'
 
 function App() {
   const [page, setPage] = useState<PageKey>('Home')
   const isAuthenticated = useAdminStore((s) => s.isAuthenticated)
+  const loadContent = usePageContentStore((s) => s.loadContent)
+  const isLoading = usePageContentStore((s) => s.isLoading)
 
   const brandName = 'Furniture Odyssey'
+
+  /* Load global page content once on mount */
+  useEffect(() => {
+    loadContent()
+  }, [loadContent])
 
   /* Guard: redirect away from Admin if not authenticated */
   useEffect(() => {
@@ -26,6 +34,17 @@ function App() {
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [page])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-cream)]">
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+          <p className="mt-4 font-display text-xl text-[var(--text-dark)]">Loading Sanctuary...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-cream)] text-[var(--text-dark)]">

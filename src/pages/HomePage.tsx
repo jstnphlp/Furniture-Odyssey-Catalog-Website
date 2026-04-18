@@ -5,17 +5,11 @@ import { MiniCard } from "../components/MiniCard";
 import { RuleMotif } from "../components/RuleMotif";
 import { ProductModal } from "../components/ProductModal";
 import type { ProductModalData } from "../components/ProductModal";
+import { usePageContentStore } from "../stores/usePageContentStore";
 
 const supabase = createClient();
 const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
 const MAX_HOMEPAGE_FEATURED = 4;
-
-interface PageContentField {
-  page: string;
-  section: string;
-  field_key: string;
-  field_value: string;
-}
 
 const mapDbProduct = (row: any): Product => {
   const rawFeatures = Array.isArray(row.features) ? row.features : [];
@@ -47,9 +41,10 @@ const mapDbProduct = (row: any): Product => {
 export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState<Record<string, string>>({});
   const [variationsByProduct, setVariationsByProduct] = useState<Map<string, { color: TableOption[]; size: TableOption[] }>>(new Map());
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
+
+  const getField = usePageContentStore((s) => s.getField);
 
   useEffect(() => {
     let isMounted = true;
@@ -107,28 +102,7 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
       }
     };
 
-    const fetchContent = async () => {
-      const { data, error } = await supabase
-        .from("page_content")
-        .select("*")
-        .eq("page", "home");
-
-      if (error) {
-        console.error("Failed to fetch homepage content", error);
-        return;
-      }
-
-      if (isMounted) {
-        const map: Record<string, string> = {};
-        for (const row of (data ?? []) as PageContentField[]) {
-          map[`${row.section}--${row.field_key}`] = row.field_value;
-        }
-        setContent(map);
-      }
-    };
-
     void fetchProducts();
-    void fetchContent();
 
     const channel = supabase
       .channel("homepage-products-live")
@@ -137,13 +111,6 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
         { event: "*", schema: "public", table: "products" },
         () => {
           void fetchProducts(false);
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "page_content" },
-        () => {
-          void fetchContent();
         },
       )
       .subscribe();
@@ -155,8 +122,8 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
   }, []);
 
   /* Helper to get content with fallback */
-  const c = (section: string, key: string, fallback: string) =>
-    content[`${section}--${key}`] ?? fallback;
+  const c = useCallback((section: string, key: string, fallback: string) =>
+    getField("home", section, key, fallback), [getField]);
 
   /* Curate items for the horizontal pick row */
   const curatorPicks = useMemo(() => {
