@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { SiteNav, type PageKey } from './components/SiteNav'
 import { SiteFooter } from './components/SiteFooter'
 import { AdminLoginModal } from './components/AdminLoginModal'
+import { CartDrawer } from './components/CartDrawer'
 import { HomePage } from './pages/HomePage'
 import { ChairsPage } from './pages/ChairsPage'
 import { TablesPage } from './pages/TablesPage'
@@ -66,6 +67,9 @@ function App() {
 
       {/* Admin login modal — always mounted, visibility from store */}
       <AdminLoginModal />
+
+      {/* Cart drawer — always mounted, visibility from store */}
+      <CartDrawer />
     </div>
   )
 }

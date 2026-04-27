@@ -1,5 +1,7 @@
 import type { Product, CustomizableTable } from '../types/catalog'
 import { Badge } from './Badge'
+import { useCartStore } from '../stores/useCartStore'
+import { ProgressiveImage } from './ProgressiveImage'
 
 interface MiniCardProps {
   product: Product | CustomizableTable
@@ -32,7 +34,7 @@ export function MiniCard({
       onClick={handleClick}
     >
       <div className="relative overflow-hidden rounded-xl">
-        <img
+        <ProgressiveImage
           src={product.image}
           alt={product.name}
           className="h-52 w-full rounded-xl object-cover transition-transform duration-500 group-hover:scale-105"
@@ -63,7 +65,24 @@ export function MiniCard({
         <button
           type="button"
           className="text-link mt-1"
-          onClick={(e) => { e.stopPropagation(); handleClick(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (product.isCustomizable) {
+              handleClick();
+            } else {
+              const addItem = useCartStore.getState().addItem;
+              const openCart = useCartStore.getState().openCart;
+              addItem({
+                id: product.id,
+                name: product.name,
+                image_url: product.image,
+                price: product.basePrice,
+                category: product.category,
+                cta_label: cta,
+              });
+              openCart();
+            }
+          }}
         >
           {product.isCustomizable ? 'Configure →' : `${cta} →`}
         </button>

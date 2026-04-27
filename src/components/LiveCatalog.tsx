@@ -3,6 +3,8 @@ import { createClient } from "../lib/client";
 import type { ProductCategory, TableOption } from "../types/catalog";
 import type { ProductModalData } from "./ProductModal";
 import { ProductModal } from "./ProductModal";
+import { useCartStore } from "../stores/useCartStore";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 interface LiveCatalogProps {
   category: ProductCategory;
@@ -148,6 +150,21 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
 
   const closeModal = useCallback(() => setModalData(null), []);
 
+  const addItem = useCartStore((s) => s.addItem);
+  const openCartDrawer = useCartStore((s) => s.openCart);
+
+  const addToCart = useCallback((item: CatalogItem) => {
+    addItem({
+      id: item.id,
+      name: item.name,
+      image_url: item.image,
+      price: item.basePrice,
+      category: item.category,
+      cta_label: item.ctaLabel || "Add to Bag",
+    });
+    openCartDrawer();
+  }, [addItem, openCartDrawer]);
+
   const arranged: CatalogItem[] = [];
   const featuredItems = [...items.filter((i) => i.isFeatured)];
   const normalItems = [...items.filter((i) => !i.isFeatured)];
@@ -263,10 +280,11 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                   >
                     <div>
                       <div className="relative overflow-hidden rounded-[14px] pt-[56.25%]">
-                        <img
+                        <ProgressiveImage
                           src={featured.image}
                           alt={featured.name}
                           className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="eager"
                         />
                         {featured.badge && (
                           <div className="absolute left-4 top-4 rounded-full bg-[#008784] px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm">
@@ -318,7 +336,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                       <button
                         type="button"
                         className="text-[13px] font-bold text-[var(--text-mid)] transition-colors hover:text-[#008784]"
-                        onClick={(e) => { e.stopPropagation(); openModal(featured); }}
+                        onClick={(e) => { e.stopPropagation(); addToCart(featured); }}
                       >
                         Quick Shop
                       </button>
@@ -334,10 +352,11 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                   >
                     <div>
                       <div className="relative overflow-hidden rounded-[14px] pt-[75%]">
-                        <img
+                        <ProgressiveImage
                           src={secondary.image}
                           alt={secondary.name}
                           className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="eager"
                         />
                         {secondary.badge && (
                           <div className="absolute left-3 top-3 rounded-full bg-[#008784] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm">
@@ -359,7 +378,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                       <button
                         type="button"
                         className="text-[13px] font-bold text-[var(--text-mid)] transition-colors hover:text-[#008784]"
-                        onClick={(e) => { e.stopPropagation(); openModal(secondary); }}
+                        onClick={(e) => { e.stopPropagation(); addToCart(secondary); }}
                       >
                         Quick Shop
                       </button>
@@ -384,7 +403,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                   >
                     <div>
                       <div className="relative overflow-hidden rounded-[14px] pt-[100%]">
-                        <img
+                        <ProgressiveImage
                           src={gridItem.image}
                           alt={gridItem.name}
                           className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -409,7 +428,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                       <button
                         type="button"
                         className="w-full rounded-lg bg-[#2C2218] px-4 py-2.5 text-center text-[13px] font-bold text-white transition-colors hover:bg-black"
-                        onClick={(e) => { e.stopPropagation(); openModal(gridItem); }}
+                        onClick={(e) => { e.stopPropagation(); addToCart(gridItem); }}
                       >
                         {gridItem.ctaLabel || "Add to Bag"}
                       </button>

@@ -3,6 +3,7 @@ import { FilterBar } from "../components/FilterBar";
 import { RuleMotif } from "../components/RuleMotif";
 import { LiveCatalog } from "../components/LiveCatalog";
 import { usePageContentStore } from "../stores/usePageContentStore";
+import { ProgressiveImage } from "../components/ProgressiveImage";
 
 export function TablesPage() {
   const getField = usePageContentStore((s) => s.getField);
@@ -17,10 +18,11 @@ export function TablesPage() {
         className="relative overflow-hidden rounded-2xl"
         id="tables-hero"
       >
-        <img
+        <ProgressiveImage
           src={c("hero", "image", "/images/wood-grain.png")}
           alt="Close-up of wood grain"
           className="h-[420px] w-full object-cover brightness-[0.85]"
+          loading="eager"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#2c2218cc] via-[#2c221866] to-transparent" />
         <div className="absolute inset-0 z-10 flex flex-col justify-center p-8 sm:p-12">
@@ -35,7 +37,14 @@ export function TablesPage() {
             {c("hero", "description", "Crafted from solid oak and steel married, our tables are built to be the heart of your home. Turn every deliberation to your sanctuary.")}
           </p>
           <div className="mt-6">
-            <button type="button" className="primary-btn" id="tables-start-btn">
+            <button
+              type="button"
+              className="primary-btn"
+              id="tables-start-btn"
+              onClick={() => {
+                document.getElementById('curated-catalog')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
               {c("hero", "btn_label", "Start Gathering")}
             </button>
           </div>

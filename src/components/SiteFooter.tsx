@@ -93,12 +93,12 @@ export function SiteFooter({
         <div className="container flex flex-wrap items-center justify-between gap-4 py-5 text-[11px] text-[var(--text-mid)]">
           <p>© 2026 {brandName}. All rights reserved.</p>
           <div className="flex gap-6">
-            <span className="cursor-pointer transition hover:text-[var(--text-dark)]">
+            <button type="button" className="cursor-pointer transition hover:text-[var(--text-dark)]" onClick={() => alert('Privacy Policy coming soon.')}>
               Privacy Policy
-            </span>
-            <span className="cursor-pointer transition hover:text-[var(--text-dark)]">
+            </button>
+            <button type="button" className="cursor-pointer transition hover:text-[var(--text-dark)]" onClick={() => alert('Terms of Use coming soon.')}>
               Terms of Use
-            </span>
+            </button>
           </div>
         </div>
       </div>

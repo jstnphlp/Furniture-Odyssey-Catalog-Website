@@ -6,6 +6,7 @@ import { RuleMotif } from "../components/RuleMotif";
 import { ProductModal } from "../components/ProductModal";
 import type { ProductModalData } from "../components/ProductModal";
 import { usePageContentStore } from "../stores/usePageContentStore";
+import { ProgressiveImage } from "../components/ProgressiveImage";
 
 const supabase = createClient();
 const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
@@ -197,7 +198,7 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
             >
               {c("hero", "btn1_label", "Explore the Collection")}
             </button>
-            <button type="button" className="secondary-btn" id="hero-story-btn">
+            <button type="button" className="secondary-btn" id="hero-story-btn" onClick={() => onNavigate?.("Collections")}>
               {c("hero", "btn2_label", "Our Story")}
             </button>
           </div>
@@ -205,15 +206,17 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
 
         {/* Layered image composition */}
         <div className="relative min-h-[400px]">
-          <img
+          <ProgressiveImage
             src={heroImg1}
             alt="Artisanal writing desk"
             className="absolute right-0 top-0 h-[320px] w-[82%] rounded-2xl object-cover shadow-[0_16px_48px_rgba(44,34,24,0.14)]"
+            loading="eager"
           />
-          <img
+          <ProgressiveImage
             src={heroImg2}
             alt="Sage lounge chair"
             className="absolute -bottom-2 left-0 h-[220px] w-[56%] -rotate-2 rounded-2xl object-cover shadow-[0_14px_36px_rgba(44,34,24,0.2)]"
+            loading="eager"
           />
         </div>
       </section>
@@ -233,10 +236,10 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
             </h2>
           </div>
           <div className="hidden gap-2 sm:flex">
-            <button type="button" className="icon-button" aria-label="Previous">
+            <button type="button" className="icon-button" aria-label="Previous" onClick={() => onNavigate?.("Collections")}>
               &#8592;
             </button>
-            <button type="button" className="icon-button" aria-label="Next">
+            <button type="button" className="icon-button" aria-label="Next" onClick={() => onNavigate?.("Collections")}>
               &#8594;
             </button>
           </div>
@@ -278,7 +281,7 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
         </div>
 
         <div className="relative">
-          <img
+          <ProgressiveImage
             src={materialImg}
             alt="Craftsman finishing wood"
             className="h-[380px] w-full rounded-2xl object-cover"
@@ -294,7 +297,7 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
 
       {/* ═══ BOTTOM EDITORIAL ═══════════════════════ */}
       <section className="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
-        <img
+        <ProgressiveImage
           src={sideboardImg}
           alt="Odyssey Hutton sideboard"
           className="h-[340px] w-full rounded-2xl object-cover"

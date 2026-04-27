@@ -28,7 +28,14 @@ export function CollectionsPage() {
             {c("hero", "description", "Explore our latest ensemble of curated finished pieces, designed to bring quiet elegance and enduring warmth. A luxury curation of your home.")}
           </p>
         </div>
-        <button type="button" className="primary-btn" id="collections-cta">     
+        <button
+          type="button"
+          className="primary-btn"
+          id="collections-cta"
+          onClick={() => {
+            document.getElementById('collections-catalog')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
           {c("hero", "btn_label", "View Catalog")}
         </button>
       </section>
@@ -42,7 +49,9 @@ export function CollectionsPage() {
 
       <RuleMotif />
 
-      <LiveCatalog category="Collections" />
+      <div id="collections-catalog">
+        <LiveCatalog category="Collections" />
+      </div>
 
       <RuleMotif />
     </>

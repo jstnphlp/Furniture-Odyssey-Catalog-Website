@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Product, CustomizableTable, TableOption, ProductVariations } from "../types/catalog";
+import { useCartStore } from "../stores/useCartStore";
 
 export interface ProductModalData {
   product: Product | CustomizableTable;
@@ -58,10 +59,19 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
     if (data) {
       document.addEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "hidden";
+      // iOS Safari needs this to prevent background scroll
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.top = `-${window.scrollY}px`;
     }
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      const scrollY = document.body.style.top;
       document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+      window.scrollTo(0, parseInt(scrollY || "0") * -1);
     };
   }, [data, onClose]);
 
@@ -94,7 +104,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
       {/* Modal container */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="pointer-events-auto relative w-full max-w-[1080px] max-h-[90vh] overflow-hidden rounded-2xl bg-[var(--bg-cream)] shadow-[0_32px_80px_rgba(44,34,24,0.2)] animate-modal-enter"
+          className="pointer-events-auto relative w-full max-w-[1080px] max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl bg-[var(--bg-cream)] shadow-[0_32px_80px_rgba(44,34,24,0.2)] animate-modal-enter"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close button */}
@@ -113,7 +123,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
             {/* ═══ LEFT — Image Panel ═══ */}
             <div className="relative flex flex-col bg-[#f2ece4]">
               {/* Main product image */}
-              <div className="relative flex-1 flex items-center justify-center p-8 min-h-[320px] lg:min-h-[480px]">
+              <div className="relative flex-1 flex items-center justify-center p-4 sm:p-8 min-h-[240px] lg:min-h-[480px]">
                 <img
                   src={displayImage}
                   alt={product.name}
@@ -124,12 +134,12 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
 
                 {/* Image action icons */}
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
-                  <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-mid)] transition hover:bg-[var(--bg-cream)] hover:text-[var(--text-dark)]" title="Zoom">
+                  <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-mid)] transition hover:bg-[var(--bg-cream)] hover:text-[var(--text-dark)]" title="Zoom" onClick={() => alert('Zoom feature coming soon.')}>
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
                     </svg>
                   </button>
-                  <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-mid)] transition hover:bg-[var(--bg-cream)] hover:text-[var(--text-dark)]" title="360° View">
+                  <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-mid)] transition hover:bg-[var(--bg-cream)] hover:text-[var(--text-dark)]" title="360° View" onClick={() => alert('360° View feature coming soon.')}>
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M12 2a10 10 0 110 20 10 10 0 010-20z" /><path d="M2 12h20" />
                     </svg>
@@ -166,7 +176,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
             </div>
 
             {/* ═══ RIGHT — Configuration Panel ═══ */}
-            <div className="overflow-y-auto max-h-[90vh] lg:max-h-[90vh]">
+            <div className="lg:overflow-y-auto lg:max-h-[90vh]">
               <div className="p-6 lg:p-8 space-y-6">
                 {/* Product header */}
                 <div>
@@ -335,6 +345,20 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                   <button
                     type="button"
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#8B4513] px-6 py-4 text-[14px] font-bold text-white shadow-md transition hover:bg-[#6d350f] hover:shadow-lg active:scale-[0.98]"
+                    onClick={() => {
+                      const addItem = useCartStore.getState().addItem;
+                      const openCart = useCartStore.getState().openCart;
+                      addItem({
+                        id: product.id,
+                        name: product.name,
+                        image_url: displayImage || product.image,
+                        price: estimatedTotal,
+                        category: product.category,
+                        cta_label: hasColors || hasSizes ? "Confirm Selection" : "Add to Bag",
+                      });
+                      onClose();
+                      openCart();
+                    }}
                   >
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M3 5h2l2.3 10.2a1 1 0 001 .8h8.9a1 1 0 001-.8L20 8H7" />
@@ -343,13 +367,13 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                     {hasColors || hasSizes ? "Confirm Selection" : "Add to Bag"}
                   </button>
                   <div className="flex items-center justify-center gap-6">
-                    <button type="button" className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-mid)] transition hover:text-[var(--text-dark)]">
+                    <button type="button" className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-mid)] transition hover:text-[var(--text-dark)]" onClick={() => navigator.clipboard.writeText(window.location.href).then(() => alert('Link copied to clipboard!'))}>
                       <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
                       </svg>
                       Share Configuration
                     </button>
-                    <button type="button" className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-mid)] transition hover:text-[var(--text-dark)]">
+                    <button type="button" className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-mid)] transition hover:text-[var(--text-dark)]" onClick={() => alert('Spec sheet download coming soon.')}>
                       <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
                       </svg>
