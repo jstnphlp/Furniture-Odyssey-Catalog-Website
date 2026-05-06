@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { FilterBar } from "../components/FilterBar";
 import { RuleMotif } from "../components/RuleMotif";
 import { LiveCatalog } from "../components/LiveCatalog";
 import { usePageContentStore } from "../stores/usePageContentStore";
@@ -29,7 +28,6 @@ export function ChairsPage() {
             {c("hero", "description", "Discover sculpted silhouettes, classic designs and tactile fabrics — from artisanal studios to your sanctuary. In a chair, every piece is a sanctuary of its own.")}
           </p>
         </div>
-        <FilterBar labels={["Time by Material", "Named Arrivals"]} />
       </section>
 
       <RuleMotif />

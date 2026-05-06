@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { FilterBar } from "../components/FilterBar";
 import { RuleMotif } from "../components/RuleMotif";
 import { LiveCatalog } from "../components/LiveCatalog";
 import { usePageContentStore } from "../stores/usePageContentStore";
@@ -39,13 +38,6 @@ export function CollectionsPage() {
           {c("hero", "btn_label", "View Catalog")}
         </button>
       </section>
-
-      {/* Filter pills */}
-      <div className="-mt-14">
-        <FilterBar
-          labels={["Antiques", "Pieces", "Tables", "New Arrivals"]}
-        />
-      </div>
 
       <RuleMotif />
 

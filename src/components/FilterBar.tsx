@@ -1,21 +1,28 @@
-import { useState } from "react";
-
 interface FilterBarProps {
   labels: string[];
-  defaultActive?: number;
+  activeLabel: string | null;
+  onFilterChange: (label: string | null) => void;
 }
 
-export function FilterBar({ labels, defaultActive = 0 }: FilterBarProps) {
-  const [active, setActive] = useState(defaultActive);
+export function FilterBar({ labels, activeLabel, onFilterChange }: FilterBarProps) {
+  if (labels.length === 0) return null;
 
   return (
     <div className="flex flex-wrap gap-2">
-      {labels.map((label, index) => (
+      {/* "All" button */}
+      <button
+        type="button"
+        onClick={() => onFilterChange(null)}
+        className={`pill-filter ${activeLabel === null ? "pill-filter-active" : ""}`}
+      >
+        All
+      </button>
+      {labels.map((label) => (
         <button
           key={label}
           type="button"
-          onClick={() => setActive(index)}
-          className={`pill-filter ${index === active ? "pill-filter-active" : ""}`}
+          onClick={() => onFilterChange(label)}
+          className={`pill-filter ${label === activeLabel ? "pill-filter-active" : ""}`}
         >
           {label}
         </button>

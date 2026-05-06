@@ -42,7 +42,9 @@ const mapDbProduct = (row: any): Product => {
 export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [variationsByProduct, setVariationsByProduct] = useState<Map<string, { color: TableOption[]; size: TableOption[] }>>(new Map());
+  const [variationsByProduct, setVariationsByProduct] = useState<
+    Map<string, { color: TableOption[]; size: TableOption[] }>
+  >(new Map());
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
 
   const getField = usePageContentStore((s) => s.getField);
@@ -78,7 +80,10 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
             .in("option_group", ["Color", "Size"])
             .order("created_at", { ascending: true });
 
-          const varMap = new Map<string, { color: TableOption[]; size: TableOption[] }>();
+          const varMap = new Map<
+            string,
+            { color: TableOption[]; size: TableOption[] }
+          >();
           for (const opt of optionData ?? []) {
             if (!varMap.has(opt.product_id)) {
               varMap.set(opt.product_id, { color: [], size: [] });
@@ -123,40 +128,52 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
   }, []);
 
   /* Helper to get content with fallback */
-  const c = useCallback((section: string, key: string, fallback: string) =>
-    getField("home", section, key, fallback), [getField]);
+  const c = useCallback(
+    (section: string, key: string, fallback: string) =>
+      getField("home", section, key, fallback),
+    [getField],
+  );
 
   /* Curate items for the horizontal pick row */
   const curatorPicks = useMemo(() => {
-    const explicitlyFeatured = products.filter((p) => p.isHomepageFeatured);
-    const picks = [...explicitlyFeatured.slice(0, MAX_HOMEPAGE_FEATURED)];
-    // Fill up to 4 if needed to maintain design
-    if (picks.length < MAX_HOMEPAGE_FEATURED) {
-      const others = products.filter((p) => !p.isHomepageFeatured);
-      picks.push(...others.slice(0, MAX_HOMEPAGE_FEATURED - picks.length));
-    }
-    return picks;
+    // Only show products explicitly marked as homepage featured
+    return products
+      .filter((p) => p.isHomepageFeatured)
+      .slice(0, MAX_HOMEPAGE_FEATURED);
   }, [products]);
 
-  const heroImg1 = c("hero", "image1",
+  const heroImg1 = c(
+    "hero",
+    "image1",
     products.find((p) => p.id === "home-001")?.image ??
-    "/images/wooden-cabinet.png");
-  const heroImg2 = c("hero", "image2",
+      "/images/wooden-cabinet.png",
+  );
+  const heroImg2 = c(
+    "hero",
+    "image2",
     products.find((p) => p.id === "chair-002")?.image ??
-    "/images/chair-sage.png");
+      "/images/chair-sage.png",
+  );
   const materialImg = c("honest_materials", "image", "/images/craftsman.png");
-  const sideboardImg = c("featured_story", "image", "/images/modern-sideboard.png");
+  const sideboardImg = c(
+    "featured_story",
+    "image",
+    "/images/modern-sideboard.png",
+  );
 
-  const handleOpenModal = useCallback((product: Product) => {
-    const vars = variationsByProduct.get(product.id);
-    setModalData({
-      product,
-      variations: {
-        colorOptions: vars?.color ?? [],
-        sizeOptions: vars?.size ?? [],
-      },
-    });
-  }, [variationsByProduct]);
+  const handleOpenModal = useCallback(
+    (product: Product) => {
+      const vars = variationsByProduct.get(product.id);
+      setModalData({
+        product,
+        variations: {
+          colorOptions: vars?.color ?? [],
+          sizeOptions: vars?.size ?? [],
+        },
+      });
+    },
+    [variationsByProduct],
+  );
 
   const handleCloseModal = useCallback(() => setModalData(null), []);
 
@@ -184,10 +201,16 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
           </p>
           <h1 className="font-display text-[46px] leading-[1.06] text-[var(--text-dark)] sm:text-[60px]">
             {c("hero", "title", "Sculpting")}{" "}
-            <span className="italic text-[var(--primary)]">{c("hero", "italic", "Silence")}</span>
+            <span className="italic text-[var(--primary)]">
+              {c("hero", "italic", "Silence")}
+            </span>
           </h1>
           <p className="mt-5 max-w-lg text-[14px] leading-[1.7] text-[var(--text-mid)]">
-            {c("hero", "description", "Discover the harmony between form and living craft. Every piece is designed to bring a sense of quiet permanence to your contemporary sanctuary.")}
+            {c(
+              "hero",
+              "description",
+              "Discover the harmony between form and living craft. Every piece is designed to bring a sense of quiet permanence to your contemporary sanctuary.",
+            )}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <button
@@ -197,9 +220,6 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
               onClick={() => onNavigate?.("Collections")}
             >
               {c("hero", "btn1_label", "Explore the Collection")}
-            </button>
-            <button type="button" className="secondary-btn" id="hero-story-btn" onClick={() => onNavigate?.("Collections")}>
-              {c("hero", "btn2_label", "Our Story")}
             </button>
           </div>
         </div>
@@ -229,17 +249,31 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-mid)]">
-              {c("curators_pick", "eyebrow", "a daily focus on modern, distinctive classics, handcrafted furniture and more.")}
+              {c(
+                "curators_pick",
+                "eyebrow",
+                "a daily focus on modern, distinctive classics, handcrafted furniture and more.",
+              )}
             </p>
             <h2 className="font-display text-[32px] leading-tight text-[var(--text-dark)] sm:text-[36px]">
               {c("curators_pick", "title", "The Digital Curator\u0027s Pick")}
             </h2>
           </div>
           <div className="hidden gap-2 sm:flex">
-            <button type="button" className="icon-button" aria-label="Previous" onClick={() => onNavigate?.("Collections")}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Previous"
+              onClick={() => onNavigate?.("Collections")}
+            >
               &#8592;
             </button>
-            <button type="button" className="icon-button" aria-label="Next" onClick={() => onNavigate?.("Collections")}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Next"
+              onClick={() => onNavigate?.("Collections")}
+            >
               &#8594;
             </button>
           </div>
@@ -247,7 +281,12 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {curatorPicks.map((product) =>
             product ? (
-              <MiniCard key={product.id} product={product} cta="Quick Shop" onOpenModal={handleOpenModal as any} />
+              <MiniCard
+                key={product.id}
+                product={product}
+                cta="Quick Shop"
+                onOpenModal={handleOpenModal as any}
+              />
             ) : null,
           )}
         </div>
@@ -266,10 +305,18 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
             </span>
           </h2>
           <p className="mt-5 max-w-lg text-[14px] leading-[1.7] text-[var(--text-mid)]">
-            {c("honest_materials", "description", "We believe furniture should tell a story worth repeating. In a world of disposable convenience, our \"Honest Material\" movement — where the wood grain is embraced and the visible construction provides testament to the artisan\u0027s touch.")}
+            {c(
+              "honest_materials",
+              "description",
+              'We believe furniture should tell a story worth repeating. In a world of disposable convenience, our "Honest Material" movement — where the wood grain is embraced and the visible construction provides testament to the artisan\u0027s touch.',
+            )}
           </p>
           <p className="mt-4 max-w-lg text-[13px] leading-[1.7] text-[var(--text-mid)]">
-            {c("honest_materials", "description2", "Every piece at Furniture Odyssey is crafted to ensure the finest for us, preserving all of nature\u0027s warmth for your home\u0027s next chapter.")}
+            {c(
+              "honest_materials",
+              "description2",
+              "Every piece at Furniture Odyssey is crafted to ensure the finest for us, preserving all of nature\u0027s warmth for your home\u0027s next chapter.",
+            )}
           </p>
           <button
             type="button"
@@ -289,7 +336,13 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
           {/* Floating quote card */}
           <aside className="absolute -bottom-6 right-6 max-w-[240px] rounded-xl bg-white p-5 shadow-[0_16px_36px_rgba(44,34,24,0.12)]">
             <p className="font-display text-[15px] italic leading-snug text-[var(--text-dark)]">
-              &ldquo;{c("honest_materials", "quote", "Every grain tells a story of patient hands.")}&rdquo;
+              &ldquo;
+              {c(
+                "honest_materials",
+                "quote",
+                "Every grain tells a story of patient hands.",
+              )}
+              &rdquo;
             </p>
           </aside>
         </div>
@@ -308,10 +361,16 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
           </p>
           <h2 className="font-display text-[30px] leading-tight text-[var(--text-dark)]">
             {c("featured_story", "title", "From Workshop")}{" "}
-            <span className="italic text-[var(--primary)]">{c("featured_story", "italic", "to Sanctuary")}</span>
+            <span className="italic text-[var(--primary)]">
+              {c("featured_story", "italic", "to Sanctuary")}
+            </span>
           </h2>
           <p className="mt-4 max-w-lg text-[14px] leading-[1.7] text-[var(--text-mid)]">
-            {c("featured_story", "description", "Follow the journey of a single slab of oak as it transforms from raw timber into a dining table designed to last for generations.")}
+            {c(
+              "featured_story",
+              "description",
+              "Follow the journey of a single slab of oak as it transforms from raw timber into a dining table designed to last for generations.",
+            )}
           </p>
           <button
             type="button"

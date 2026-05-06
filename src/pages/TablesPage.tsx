@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { FilterBar } from "../components/FilterBar";
 import { RuleMotif } from "../components/RuleMotif";
 import { LiveCatalog } from "../components/LiveCatalog";
 import { usePageContentStore } from "../stores/usePageContentStore";
@@ -60,13 +59,10 @@ export function TablesPage() {
 
       {/* ═══ CURATED CATALOG ════════════════════════ */}
       <section id="curated-catalog" className="mt-12">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="mb-6">
           <h2 className="font-display text-[32px] text-[var(--text-dark)]">
             {c("catalog", "title", "Curated Catalog")}
           </h2>
-          <FilterBar
-            labels={["All Tables", "Dining", "Coffee", "New Arrivals"]}
-          />
         </div>
 
         <LiveCatalog category="Tables" />

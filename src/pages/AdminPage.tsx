@@ -11,6 +11,11 @@ const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
 const MAX_HOMEPAGE_FEATURED = 4;
 type OptionGroup = "Top" | "Legs" | "Base";
 
+interface TagItem {
+  id: string;
+  name: string;
+}
+
 const STATIC_IMAGE_SEED_PRODUCTS = [
   {
     id: "seed-chair-artisan-lounge",
@@ -651,6 +656,112 @@ function SectionCard({
 }
 
 /* ═══════════════════════════════════════════════════════
+   Tag Chip Selector — toggleable chips for assigning tags
+   ═══════════════════════════════════════════════════════ */
+
+function TagChipSelector({
+  allTags,
+  selectedTagIds,
+  onToggle,
+  onCreateTag,
+}: {
+  allTags: TagItem[];
+  selectedTagIds: Set<string>;
+  onToggle: (tagId: string) => void;
+  onCreateTag?: (name: string) => Promise<void>;
+}) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+
+  const handleCreate = async () => {
+    if (!newTagName.trim() || !onCreateTag) {
+      setIsCreating(false);
+      return;
+    }
+    await onCreateTag(newTagName);
+    setNewTagName("");
+    setIsCreating(false);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="mb-0.5 block text-[11px] font-bold uppercase tracking-wider text-[var(--text-mid)]">
+        🏷️ Tags
+      </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {allTags.length === 0 && !isCreating && (
+          <span className="text-[11px] text-[var(--text-mid)] italic mr-2">
+            No tags yet.
+          </span>
+        )}
+        {allTags.map((tag) => {
+          const isSelected = selectedTagIds.has(tag.id);
+          return (
+            <button
+              key={tag.id}
+              type="button"
+              onClick={() => onToggle(tag.id)}
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                isSelected
+                  ? "border-[var(--text-dark)] bg-[var(--text-dark)] text-white"
+                  : "border-[var(--border-card)] bg-white text-[var(--text-mid)] hover:border-[var(--text-dark)] hover:text-[var(--text-dark)]"
+              }`}
+            >
+              {isSelected && "✓ "}{tag.name}
+            </button>
+          );
+        })}
+        {onCreateTag && (
+          isCreating ? (
+            <div className="flex items-center gap-1 rounded-full border border-[var(--text-dark)] bg-white px-2 py-0.5 ml-1">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Tag name..."
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleCreate();
+                  } else if (e.key === "Escape") {
+                    setIsCreating(false);
+                    setNewTagName("");
+                  }
+                }}
+                className="w-24 bg-transparent text-[11px] font-semibold outline-none placeholder:font-normal"
+              />
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                className="text-[11px] font-bold text-[var(--text-dark)] hover:scale-110 transition-transform"
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsCreating(false); setNewTagName(""); }}
+                className="text-[11px] font-bold text-[var(--text-mid)] hover:scale-110 transition-transform"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsCreating(true)}
+              className="ml-1 rounded-full border border-dashed border-[var(--text-mid)] px-3 py-1 text-[11px] font-semibold text-[var(--text-mid)] hover:border-[var(--text-dark)] hover:text-[var(--text-dark)] transition"
+            >
+              + New Tag
+            </button>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    Product List — filtered by category, with edit/delete
    ═══════════════════════════════════════════════════════ */
 
@@ -674,6 +785,11 @@ function ProductListSection({
   editImageUploading,
   editVariations,
   setEditVariations,
+  allTags,
+  editTagIds,
+  onToggleEditTag,
+  productTagMap,
+  onCreateTag,
 }: {
   category: "Chairs" | "Tables" | "Collections";
   products: (Product | CustomizableTable)[];
@@ -694,6 +810,11 @@ function ProductListSection({
   editImageUploading: boolean;
   editVariations: VariationState;
   setEditVariations: (v: VariationState) => void;
+  allTags: TagItem[];
+  editTagIds: Set<string>;
+  onToggleEditTag: (tagId: string) => void;
+  productTagMap: Map<string, string[]>;
+  onCreateTag: (name: string) => Promise<void>;
 }) {
   const filtered = products.filter((p) => p.category === category);
 
@@ -709,6 +830,7 @@ function ProductListSection({
 
   return (
     <div className="space-y-3">
+      <div className="text-[10px] text-red-500">DEBUG: Total products in store: {products.length}, Filtered for {category}: {filtered.length}</div>
       {filtered.map((p) => {
         const isEditing = editingProduct === p.id;
         return (
@@ -752,6 +874,19 @@ function ProductListSection({
                         <span>₱{p.basePrice.toLocaleString()}</span>
                         {p.dimensions && <span>📐 {p.dimensions}</span>}
                       </div>
+                      {/* Display assigned tags */}
+                      {(productTagMap.get(p.id) ?? []).length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(productTagMap.get(p.id) ?? []).map((tagName) => (
+                            <span
+                              key={tagName}
+                              className="rounded-full bg-[var(--bg-cream)] border border-[var(--border-warm)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-mid)]"
+                            >
+                              {tagName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
@@ -912,6 +1047,16 @@ function ProductListSection({
                   </div>
                 </div>
 
+                {/* Tag Selector */}
+                <TagChipSelector
+                  allTags={allTags}
+                  selectedTagIds={editTagIds}
+                  onToggle={onToggleEditTag}
+                  onCreateTag={async (name) => {
+                    await onCreateTag(name);
+                  }}
+                />
+
                 {/* Variation Editor */}
                 <VariationEditor state={editVariations} onChange={setEditVariations} />
 
@@ -1003,6 +1148,13 @@ export function AdminPage() {
   const [editVariations, setEditVariations] = useState<VariationState>(emptyVariationState);
   const [newProductVariations, setNewProductVariations] = useState<VariationState>(emptyVariationState);
 
+  // ── Tag Management State ──
+  const [allTags, setAllTags] = useState<TagItem[]>([]);
+  const [newTagName, setNewTagName] = useState("");
+  const [editTagIds, setEditTagIds] = useState<Set<string>>(new Set());
+  const [newProductTagIds, setNewProductTagIds] = useState<Set<string>>(new Set());
+  const [productTagMap, setProductTagMap] = useState<Map<string, string[]>>(new Map());
+
   const addFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1061,10 +1213,15 @@ export function AdminPage() {
             Top: [],
             Legs: [],
             Base: [],
-          });
+            Color: [],
+            Size: [],
+          } as any);
         }
 
-        groupedOptions.get(option.product_id)?.[group].push({
+        const g = groupedOptions.get(option.product_id)!;
+        if (!g[group]) g[group] = [];
+        
+        g[group].push({
           id: option.id,
           name: option.name,
           priceModifier: Number(option.price_modifier ?? 0),
@@ -1120,6 +1277,116 @@ export function AdminPage() {
     };
   }, [setProducts]);
 
+  // Load tags and product-tag assignments
+  useEffect(() => {
+    const loadTags = async () => {
+      const [{ data: tagRows }, { data: assignmentRows }] = await Promise.all([
+        supabase.from("tags").select("*").order("name", { ascending: true }),
+        supabase.from("product_tag_assignments").select("product_id, tag_id, tags(name)"),
+      ]);
+
+      if (tagRows) {
+        setAllTags(tagRows.map((r: any) => ({ id: r.id, name: r.name })));
+      }
+
+      if (assignmentRows) {
+        const pMap = new Map<string, string[]>();
+        for (const a of assignmentRows) {
+          const pid = a.product_id;
+          const tagName = (a as any).tags?.name;
+          if (!tagName) continue;
+          if (!pMap.has(pid)) pMap.set(pid, []);
+          pMap.get(pid)!.push(tagName);
+        }
+        setProductTagMap(pMap);
+      }
+    };
+    void loadTags();
+  }, []);
+
+  const handleCreateTag = async () => {
+    const trimmed = newTagName.trim();
+    if (!trimmed) return;
+    const id = `tag-${trimmed.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+    const { error } = await supabase.from("tags").insert({ id, name: trimmed });
+    if (error) {
+      alert(`Failed to create tag: ${error.message}`);
+      return;
+    }
+    setAllTags((prev) => [...prev, { id, name: trimmed }].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewTagName("");
+  };
+
+  const handleCreateTagInline = async (name: string, isEditing: boolean) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const id = `tag-${trimmed.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+    const { error } = await supabase.from("tags").insert({ id, name: trimmed });
+    if (error) {
+      alert(`Failed to create tag: ${error.message}`);
+      return;
+    }
+    setAllTags((prev) => [...prev, { id, name: trimmed }].sort((a, b) => a.name.localeCompare(b.name)));
+    
+    // Automatically select it
+    if (isEditing) {
+      setEditTagIds((prev) => new Set([...prev, id]));
+    } else {
+      setNewProductTagIds((prev) => new Set([...prev, id]));
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string) => {
+    const confirmed = window.confirm("Delete this tag? It will be removed from all products.");
+    if (!confirmed) return;
+    const { error } = await supabase.from("tags").delete().eq("id", tagId);
+    if (error) {
+      alert(`Failed to delete tag: ${error.message}`);
+      return;
+    }
+    setAllTags((prev) => prev.filter((t) => t.id !== tagId));
+  };
+
+  const toggleEditTag = (tagId: string) => {
+    setEditTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  };
+
+  const toggleNewProductTag = (tagId: string) => {
+    setNewProductTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  };
+
+  const saveTagAssignments = async (productId: string, tagIds: Set<string>) => {
+    // Delete existing assignments
+    await supabase.from("product_tag_assignments").delete().eq("product_id", productId);
+    // Insert new ones
+    if (tagIds.size > 0) {
+      const rows = Array.from(tagIds).map((tagId) => ({ product_id: productId, tag_id: tagId }));
+      const { error } = await supabase.from("product_tag_assignments").insert(rows);
+      if (error) {
+        console.error("Failed to save tag assignments:", error.message);
+      }
+    }
+    // Update local map
+    const tagNames = Array.from(tagIds)
+      .map((tid) => allTags.find((t) => t.id === tid)?.name)
+      .filter(Boolean) as string[];
+    setProductTagMap((prev) => {
+      const next = new Map(prev);
+      next.set(productId, tagNames);
+      return next;
+    });
+  };
+
   const flash = (id: string) => {
     setSaveFlash(id);
     setTimeout(() => setSaveFlash(null), 1200);
@@ -1136,12 +1403,18 @@ export function AdminPage() {
     });
 
     // Load existing Color/Size variations for this product
-    const { data: existingOpts } = await supabase
-      .from("table_options")
-      .select("*")
-      .eq("product_id", p.id)
-      .in("option_group", ["Color", "Size"])
-      .order("created_at", { ascending: true });
+    const [{ data: existingOpts }, { data: existingTagAssignments }] = await Promise.all([
+      supabase
+        .from("table_options")
+        .select("*")
+        .eq("product_id", p.id)
+        .in("option_group", ["Color", "Size"])
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("product_tag_assignments")
+        .select("tag_id")
+        .eq("product_id", p.id),
+    ]);
 
     const colors: VariationEntry[] = [];
     const sizes: VariationEntry[] = [];
@@ -1163,6 +1436,9 @@ export function AdminPage() {
       colors,
       sizes,
     });
+
+    // Load existing tag assignments
+    setEditTagIds(new Set((existingTagAssignments ?? []).map((a: any) => a.tag_id)));
   };
 
   const saveEditing = async () => {
@@ -1213,17 +1489,10 @@ export function AdminPage() {
       features: Array.isArray(productToEdit.features)
         ? productToEdit.features
         : [],
+      updated_at: new Date().toISOString(),
     };
 
-    const { error: upsertError } = await supabase
-      .from("products")
-      .upsert(payload, { onConflict: "id" });
-
-    if (upsertError) {
-      setSavingProductId(null);
-      alert(`Failed to save product: ${upsertError.message}`);
-      return;
-    }
+    // Delay upsert to end to trigger realtime broadcast correctly after assignments save
 
     updateProduct(editingProduct, {
       name: payload.name,
@@ -1235,10 +1504,24 @@ export function AdminPage() {
     // ── Save variations ──
     await saveVariationsForProduct(editingProduct, editVariations);
 
+    // ── Save tag assignments ──
+    await saveTagAssignments(editingProduct, editTagIds);
+
+    const { error: upsertError } = await supabase
+      .from("products")
+      .upsert(payload, { onConflict: "id" });
+
+    if (upsertError) {
+      setSavingProductId(null);
+      alert(`Failed to save product: ${upsertError.message}`);
+      return;
+    }
+
     flash(editingProduct);
     setEditingProduct(null);
     setEditImageFile(null);
     setEditVariations(emptyVariationState);
+    setEditTagIds(new Set());
     setSavingProductId(null);
   };
 
@@ -1423,6 +1706,7 @@ export function AdminPage() {
         description: newProductState.description,
         dimensions: newProductState.dimensions,
         is_customizable: false,
+        updated_at: new Date().toISOString(),
       };
 
       const { error: insertError } = await supabase
@@ -1450,6 +1734,9 @@ export function AdminPage() {
       // Save variations for the new product
       await saveVariationsForProduct(newId, newProductVariations);
 
+      // Save tag assignments for the new product
+      await saveTagAssignments(newId, newProductTagIds);
+
       setNewProductState({
         name: "",
         description: "",
@@ -1459,6 +1746,7 @@ export function AdminPage() {
         imageFile: null,
       });
       setNewProductVariations(emptyVariationState);
+      setNewProductTagIds(new Set());
       setIsAddingProduct(false);
       flash(newId);
     } catch (err: any) {
@@ -1570,6 +1858,59 @@ export function AdminPage() {
     { key: "availability", label: "Availability", icon: "◉" },
     { key: "content", label: "Content", icon: "✎" },
   ];
+
+  /* ── Tag Manager Section (rendered inside Content tab) ── */
+  const renderTagManager = () => (
+    <SectionCard
+      icon="🏷️"
+      title="Tag Manager"
+      description="Create and manage global tags for product filtering"
+    >
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newTagName}
+          onChange={(e) => setNewTagName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { void handleCreateTag(); } }}
+          placeholder="New tag name..."
+          className="flex-1 rounded-lg border border-[var(--border-card)] bg-[var(--bg-cream)] px-3 py-2 text-[13px] text-[var(--text-dark)] outline-none focus:border-[var(--primary)]"
+        />
+        <button
+          type="button"
+          onClick={() => { void handleCreateTag(); }}
+          className="primary-btn text-[12px]"
+        >
+          + Add Tag
+        </button>
+      </div>
+      {allTags.length === 0 ? (
+        <p className="mt-3 text-[12px] text-[var(--text-mid)] italic">
+          No tags yet. Create one above.
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {allTags.map((tag) => (
+            <div
+              key={tag.id}
+              className="flex items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-white px-3 py-1.5"
+            >
+              <span className="text-[12px] font-semibold text-[var(--text-dark)]">
+                {tag.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => { void handleDeleteTag(tag.id); }}
+                className="text-[11px] font-bold text-red-400 hover:text-red-600 transition"
+                title="Delete tag"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
 
   const contentPages: { key: ContentPage; label: string; icon: string }[] = [
     { key: "home", label: "Home", icon: "🏠" },
@@ -1698,6 +2039,14 @@ export function AdminPage() {
             className="w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none"
           />
         </div>
+
+        {/* Tag Selector for new product */}
+        <TagChipSelector
+          allTags={allTags}
+          selectedTagIds={newProductTagIds}
+          onToggle={toggleNewProductTag}
+          onCreateTag={(name) => handleCreateTagInline(name, false)}
+        />
 
         {/* Variation Editor for new product */}
         <VariationEditor state={newProductVariations} onChange={setNewProductVariations} />
@@ -2020,6 +2369,9 @@ export function AdminPage() {
                 </button>
               </div>
 
+              {/* Tag Manager */}
+              {renderTagManager()}
+
               {/* Hero Section */}
               <SectionCard
                 icon="🎯"
@@ -2288,6 +2640,11 @@ export function AdminPage() {
                   editImageUploading={editImageUploading}
                   editVariations={editVariations}
                   setEditVariations={setEditVariations}
+                  allTags={allTags}
+                  editTagIds={editTagIds}
+                  onToggleEditTag={toggleEditTag}
+                  productTagMap={productTagMap}
+                  onCreateTag={(name) => handleCreateTagInline(name, true)}
                 />
               </SectionCard>
             </div>
@@ -2412,6 +2769,11 @@ export function AdminPage() {
                   editImageUploading={editImageUploading}
                   editVariations={editVariations}
                   setEditVariations={setEditVariations}
+                  allTags={allTags}
+                  editTagIds={editTagIds}
+                  onToggleEditTag={toggleEditTag}
+                  productTagMap={productTagMap}
+                  onCreateTag={(name) => handleCreateTagInline(name, true)}
                 />
               </SectionCard>
             </div>
@@ -2504,6 +2866,11 @@ export function AdminPage() {
                   editImageUploading={editImageUploading}
                   editVariations={editVariations}
                   setEditVariations={setEditVariations}
+                  allTags={allTags}
+                  editTagIds={editTagIds}
+                  onToggleEditTag={toggleEditTag}
+                  productTagMap={productTagMap}
+                  onCreateTag={(name) => handleCreateTagInline(name, true)}
                 />
               </SectionCard>
             </div>

@@ -30,16 +30,20 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
   useEffect(() => {
     if (!product) return;
     setDisplayImage(product.image);
-    setSelectedColorId(colorOptions.length > 0 ? colorOptions[0].id : null);
-    setSelectedSizeId(sizeOptions.length > 0 ? sizeOptions[0].id : null);
+    // Don't auto-select — let user choose explicitly
+    setSelectedColorId(null);
+    setSelectedSizeId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
 
-  // Handle color selection → image switch
+  // Handle color selection → image switch (toggle off if already selected)
   const handleColorSelect = useCallback(
     (option: TableOption) => {
-      setSelectedColorId(option.id);
-      const nextImage = option.layerUrl || product?.image || "";
+      const isDeselecting = selectedColorId === option.id;
+      setSelectedColorId(isDeselecting ? null : option.id);
+      const nextImage = isDeselecting
+        ? (product?.image || "")
+        : (option.layerUrl || product?.image || "");
       if (nextImage !== displayImage) {
         setImageTransition(true);
         setTimeout(() => {
@@ -48,7 +52,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
         }, 150);
       }
     },
-    [product?.image, displayImage],
+    [product?.image, displayImage, selectedColorId],
   );
 
   // Escape key handler
@@ -275,7 +279,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                           <button
                             key={option.id}
                             type="button"
-                            onClick={() => setSelectedSizeId(option.id)}
+                            onClick={() => setSelectedSizeId(selectedSizeId === option.id ? null : option.id)}
                             className={`rounded-xl border px-5 py-3 text-center transition ${
                               isActive
                                 ? "border-[var(--text-dark)] bg-[var(--text-dark)]/5 shadow-sm ring-1 ring-[var(--text-dark)]/10"

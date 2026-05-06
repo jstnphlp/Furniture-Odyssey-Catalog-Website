@@ -64,33 +64,43 @@ export const usePageContentStore = create<PageContentState>((set, get) => ({
   },
 
   updateField: async (page, section, key, value) => {
-    const compositeId = `${page}-${section}-${key}`;
+    // Look up the existing row's actual ID to handle seed data with
+    // different ID formats (e.g. "home-curators-eyebrow" vs "home-curators_pick-eyebrow")
+    const existingRow = get().rows.find(
+      (r) => r.page === page && r.section === section && r.field_key === key,
+    );
+    const rowId = existingRow?.id ?? `${page}-${section}-${key}`;
 
-    // Upsert: try update first, then insert
+    const payload = {
+      id: rowId,
+      page,
+      section,
+      field_key: key,
+      field_value: value,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Upsert using the actual row ID
     const { error: upsertError } = await supabase
       .from("page_content")
-      .upsert(
-        {
-          id: compositeId,
-          page,
-          section,
-          field_key: key,
-          field_value: value,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" },
-      );
+      .upsert(payload, { onConflict: "id" });
 
     if (upsertError) {
       console.error("Failed to update page content:", upsertError.message);
       return false;
     }
 
-    // Update local state
+    // Update local state — both content map and rows array
     const k = makeKey(page, section, key);
-    set((state) => ({
-      content: { ...state.content, [k]: value },
-    }));
+    set((state) => {
+      const nextRows = existingRow
+        ? state.rows.map((r) => (r.id === rowId ? { ...r, field_value: value } : r))
+        : [...state.rows, { id: rowId, page, section, field_key: key, field_value: value }];
+      return {
+        content: { ...state.content, [k]: value },
+        rows: nextRows,
+      };
+    });
 
     return true;
   },

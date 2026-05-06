@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "../lib/client";
 import type { ProductCategory, TableOption } from "../types/catalog";
 import type { ProductModalData } from "./ProductModal";
 import { ProductModal } from "./ProductModal";
+import { FilterBar } from "./FilterBar";
 import { useCartStore } from "../stores/useCartStore";
 import { ProgressiveImage } from "./ProgressiveImage";
 
@@ -30,12 +31,14 @@ interface CatalogItem {
   isFeatured: boolean;
   colorOptions: TableOption[];
   sizeOptions: TableOption[];
+  tagNames: string[];
 }
 
 export function LiveCatalog({ category }: LiveCatalogProps) {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -43,8 +46,8 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
     async function fetchItems(showLoader = true) {
       if (showLoader) setLoading(true);
 
-      // Fetch products and their Color/Size options in parallel
-      const [{ data: productData }, { data: optionData }] = await Promise.all([
+      // Fetch products, Color/Size options, and tag assignments in parallel
+      const [{ data: productData }, { data: optionData }, { data: tagAssignmentData }] = await Promise.all([
         supabase
           .from("products")
           .select("*")
@@ -55,6 +58,9 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           .select("*")
           .in("option_group", ["Color", "Size"])
           .order("created_at", { ascending: true }),
+        supabase
+          .from("product_tag_assignments")
+          .select("product_id, tags(name)")
       ]);
 
       if (productData && isMounted) {
@@ -79,6 +85,18 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           }
         }
 
+        // Group tag names by product_id
+        const tagsByProduct = new Map<string, string[]>();
+        for (const assignment of tagAssignmentData ?? []) {
+          const productId = assignment.product_id;
+          const tagName = (assignment as any).tags?.name;
+          if (!tagName) continue;
+          if (!tagsByProduct.has(productId)) {
+            tagsByProduct.set(productId, []);
+          }
+          tagsByProduct.get(productId)!.push(tagName);
+        }
+
         const fetched: CatalogItem[] = productData.map((d: any) => ({
           id: d.id,
           name: d.name,
@@ -98,6 +116,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           isFeatured: d.is_featured ?? false,
           colorOptions: optionsByProduct.get(d.id)?.color ?? [],
           sizeOptions: optionsByProduct.get(d.id)?.size ?? [],
+          tagNames: tagsByProduct.get(d.id) ?? [],
         }));
 
         setItems(fetched);
@@ -107,21 +126,32 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
 
     void fetchItems();
 
+    let fetchTimeout: ReturnType<typeof setTimeout>;
+
     const channel = supabase
       .channel(`live-catalog-${category}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products", filter: `category=eq.${category}` },
         () => {
-          void fetchItems(false);
+          clearTimeout(fetchTimeout);
+          fetchTimeout = setTimeout(() => {
+            void fetchItems(false);
+          }, 800);
         },
       )
       .subscribe();
 
     return () => {
       isMounted = false;
+      clearTimeout(fetchTimeout);
       void supabase.removeChannel(channel);
     };
+  }, [category]);
+
+  // Reset tag filter when category changes
+  useEffect(() => {
+    setActiveTag(null);
   }, [category]);
 
   const openModal = useCallback((item: CatalogItem) => {
@@ -165,9 +195,27 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
     openCartDrawer();
   }, [addItem, openCartDrawer]);
 
+  // Compute unique tag names for this category's products
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const item of items) {
+      for (const tag of item.tagNames) {
+        tagSet.add(tag);
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [items]);
+
+  // Filter items by active tag
+  const filteredItems = useMemo(() => {
+    if (!activeTag) return items;
+    return items.filter((item) => item.tagNames.includes(activeTag));
+  }, [items, activeTag]);
+
+  // Arrange items into layout rows
   const arranged: CatalogItem[] = [];
-  const featuredItems = [...items.filter((i) => i.isFeatured)];
-  const normalItems = [...items.filter((i) => !i.isFeatured)];
+  const featuredItems = [...filteredItems.filter((i) => i.isFeatured)];
+  const normalItems = [...filteredItems.filter((i) => !i.isFeatured)];
 
   let patternIndex = 0;
   while (featuredItems.length > 0 || normalItems.length > 0) {
@@ -258,8 +306,52 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
     );
   };
 
+  // Tag pills shown on product cards
+  const TagPills = ({ item }: { item: CatalogItem }) => {
+    if (item.tagNames.length === 0) return null;
+    return (
+      <div className="mt-2 flex flex-wrap gap-1">
+        {item.tagNames.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-full bg-[var(--bg-cream)] border border-[var(--border-warm)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-mid)]"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <>
+      {/* Filter Bar */}
+      {availableTags.length > 0 && (
+        <div className="mb-6">
+          <FilterBar
+            labels={availableTags}
+            activeLabel={activeTag}
+            onFilterChange={setActiveTag}
+          />
+        </div>
+      )}
+
+      {/* Empty state for filtered results */}
+      {filteredItems.length === 0 && activeTag && (
+        <div className="py-16 text-center">
+          <p className="font-display text-[20px] text-[var(--text-mid)]">
+            No products tagged "{activeTag}" in this category.
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTag(null)}
+            className="mt-4 text-link"
+          >
+            Clear filter →
+          </button>
+        </div>
+      )}
+
       <div className="space-y-6">
         {rows.map((row, rowIndex) => {
           if (row.type === "featured-row") {
@@ -323,6 +415,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                             ))}
                           </ul>
                         )}
+                        <TagPills item={featured} />
                       </div>
                     </div>
                     <div className="mt-6 flex items-center gap-4">
@@ -373,6 +466,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                           ₱{secondary.basePrice?.toLocaleString()}
                         </p>
                       </div>
+                      <TagPills item={secondary} />
                     </div>
                     <div className="mt-4">
                       <button
@@ -423,6 +517,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                           ₱{gridItem.basePrice?.toLocaleString()}
                         </p>
                       </div>
+                      <TagPills item={gridItem} />
                     </div>
                     <div className="mt-5">
                       <button
