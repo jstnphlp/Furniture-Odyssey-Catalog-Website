@@ -91,7 +91,15 @@ export function SiteFooter({
       <div className="border-t border-[var(--border-warm)]">
         <div className="container flex flex-wrap items-center justify-between gap-4 py-5 text-[11px] text-[var(--text-mid)]">
           <p>© 2026 {brandName}. All rights reserved.</p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap items-center gap-6">
+            <a
+              href="https://shopbeyond.ink/digital-services#webservice"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition hover:text-[var(--text-dark)]"
+            >
+              Developed by beyond.ink
+            </a>
             <button type="button" className="cursor-pointer transition hover:text-[var(--text-dark)]" onClick={() => alert('Privacy Policy coming soon.')}>
               Privacy Policy
             </button>

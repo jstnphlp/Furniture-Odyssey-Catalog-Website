@@ -140,6 +140,26 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           }, 800);
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "product_tag_assignments" },
+        () => {
+          clearTimeout(fetchTimeout);
+          fetchTimeout = setTimeout(() => {
+            void fetchItems(false);
+          }, 800);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tags" },
+        () => {
+          clearTimeout(fetchTimeout);
+          fetchTimeout = setTimeout(() => {
+            void fetchItems(false);
+          }, 800);
+        },
+      )
       .subscribe();
 
     return () => {

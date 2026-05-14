@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Product, CustomizableTable, TableOption, ProductVariations } from "../types/catalog";
 import { useCartStore } from "../stores/useCartStore";
@@ -55,6 +55,9 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
     [product?.image, displayImage, selectedColorId],
   );
 
+  // Ref to persist the scroll position across effect re-fires
+  const scrollYRef = useRef(0);
+
   // Escape key handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -62,22 +65,33 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
     };
     if (data) {
       document.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
-      // iOS Safari needs this to prevent background scroll
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
-      document.body.style.top = `-${window.scrollY}px`;
     }
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      const scrollY = document.body.style.top;
+    };
+  }, [data, onClose]);
+
+  // Scroll-lock: useLayoutEffect prevents the visual flash of scrolling to top
+  useLayoutEffect(() => {
+    if (!data) return;
+
+    // Capture scroll position BEFORE applying fixed positioning
+    scrollYRef.current = window.scrollY;
+
+    document.body.style.overflow = "hidden";
+    // iOS Safari needs this to prevent background scroll
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+    document.body.style.top = `-${scrollYRef.current}px`;
+
+    return () => {
       document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.width = "";
       document.body.style.top = "";
-      window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      window.scrollTo(0, scrollYRef.current);
     };
-  }, [data, onClose]);
+  }, [data]);
 
   if (!data || !product) return null;
 

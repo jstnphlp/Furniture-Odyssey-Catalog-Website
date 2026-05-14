@@ -260,22 +260,6 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
             </h2>
           </div>
           <div className="hidden gap-2 sm:flex">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Previous"
-              onClick={() => onNavigate?.("Collections")}
-            >
-              &#8592;
-            </button>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Next"
-              onClick={() => onNavigate?.("Collections")}
-            >
-              &#8594;
-            </button>
           </div>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
