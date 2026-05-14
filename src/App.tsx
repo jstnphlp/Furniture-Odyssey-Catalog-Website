@@ -18,23 +18,17 @@ function App() {
   const isLoading = usePageContentStore((s) => s.isLoading)
 
   const brandName = 'Furniture Odyssey'
+  const visiblePage = page === 'Admin' && !isAuthenticated ? 'Home' : page
 
   /* Load global page content once on mount */
   useEffect(() => {
     loadContent()
   }, [loadContent])
 
-  /* Guard: redirect away from Admin if not authenticated */
-  useEffect(() => {
-    if (page === 'Admin' && !isAuthenticated) {
-      setPage('Home')
-    }
-  }, [page, isAuthenticated])
-
   /* Reset scroll to top on page change */
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [page])
+  }, [visiblePage])
 
   if (isLoading) {
     return (
@@ -55,15 +49,17 @@ function App() {
         brandName={brandName}
       />
 
-      <main className="container space-y-24 py-12">
-        {page === 'Home' && <HomePage onNavigate={setPage} />}
-        {page === 'Chairs' && <ChairsPage />}
-        {page === 'Tables' && <TablesPage />}
-        {page === 'Collections' && <CollectionsPage />}
-        {page === 'Admin' && isAuthenticated && <AdminPage />}
+      <main className="container space-y-24 py-12 pb-32 md:pb-12">
+        {visiblePage === 'Home' && <HomePage onNavigate={setPage} />}
+        {visiblePage === 'Chairs' && <ChairsPage />}
+        {visiblePage === 'Tables' && <TablesPage />}
+        {visiblePage === 'Collections' && <CollectionsPage />}
+        {visiblePage === 'Admin' && <AdminPage />}
       </main>
 
-      <SiteFooter brandName={brandName} onNavigate={setPage} />
+      <div className="pb-28 md:pb-0">
+        <SiteFooter brandName={brandName} onNavigate={setPage} />
+      </div>
 
       {/* Admin login modal — always mounted, visibility from store */}
       <AdminLoginModal />
