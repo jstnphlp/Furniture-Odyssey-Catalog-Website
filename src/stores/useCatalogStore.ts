@@ -7,13 +7,26 @@ interface CatalogState {
   products: Array<Product | CustomizableTable>
 
   // Admin mutations
-  updateProduct: (id: string, updates: Partial<Pick<Product, 'name' | 'description' | 'dimensions' | 'basePrice'>>) => void
+  setProducts: (products: Array<Product | CustomizableTable>) => void
+  addProduct: (product: Product | CustomizableTable) => void
+  removeProduct: (id: string) => void
+  updateProduct: (id: string, updates: Partial<Pick<Product, 'name' | 'description' | 'dimensions' | 'basePrice' | 'isHomepageFeatured' | 'features' | 'image'>>) => void
   updateTableOption: (productId: string, group: 'Top' | 'Legs' | 'Base', optionId: string, updates: Partial<Pick<TableOption, 'priceModifier' | 'available' | 'name'>>) => void
   toggleOptionAvailability: (productId: string, group: 'Top' | 'Legs' | 'Base', optionId: string) => void
 }
 
 export const useCatalogStore = create<CatalogState>((set) => ({
   products: catalogData,
+
+  setProducts: (products) => set({ products }),
+
+  addProduct: (product) =>
+    set((state) => ({ products: [product, ...state.products] })),
+
+  removeProduct: (id) =>
+    set((state) => ({
+      products: state.products.filter((p) => p.id !== id),
+    })),
 
   updateProduct: (id, updates) =>
     set((state) => ({

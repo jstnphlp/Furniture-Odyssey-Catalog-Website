@@ -25,6 +25,7 @@ export const catalogData: Array<Product | CustomizableTable> = [
     badge: 'TIMELESS',
     badgeTone: 'teal',
     isCustomizable: false,
+    isHomepageFeatured: true,
   },
   {
     id: 'chair-003',
@@ -87,6 +88,7 @@ export const catalogData: Array<Product | CustomizableTable> = [
     badge: 'GATHERABLE',
     badgeTone: 'teal',
     isCustomizable: true,
+    isHomepageFeatured: true,
     options: {
       Top: [
         { id: 'top-oak', name: 'Natural Oak', priceModifier: 0, layerUrl: '/layers/table/top/oak.png', available: true },
@@ -227,6 +229,7 @@ export const catalogData: Array<Product | CustomizableTable> = [
     badge: 'BEST SELLER',
     badgeTone: 'warm',
     isCustomizable: false,
+    isHomepageFeatured: true,
   },
   {
     id: 'home-002',
@@ -239,5 +242,6 @@ export const catalogData: Array<Product | CustomizableTable> = [
     badge: 'TIMELESS',
     badgeTone: 'teal',
     isCustomizable: false,
+    isHomepageFeatured: true,
   },
 ]

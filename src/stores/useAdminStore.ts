@@ -12,9 +12,9 @@ interface AdminState {
   clearError: () => void
 }
 
-const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? '')
+const ADMIN_EMAILS = String(import.meta.env.VITE_ADMIN_EMAILS || '')
   .split(',')
-  .map((e) => e.trim())
+  .map((e: string) => e.trim())
   .filter(Boolean)
 
 export const useAdminStore = create<AdminState>((set) => ({
