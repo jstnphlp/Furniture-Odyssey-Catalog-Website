@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react'
-import type { SVGProps } from 'react'
+import type { JSX, SVGProps } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Armchair, House, LayoutGrid, Shield } from 'lucide-react'
 import { useAdminStore } from '../stores/useAdminStore'
