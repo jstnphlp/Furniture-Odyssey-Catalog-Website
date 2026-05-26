@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "../lib/client";
-import type { ProductCategory, TableOption } from "../types/catalog";
+import {
+  getCatalogueProducts,
+  getProductTags,
+  isVisibleOnPage,
+  type CataloguePageKey,
+} from "../lib/catalogue-data";
+import type { Product, ProductCategory } from "../types/catalog";
 import type { ProductModalData } from "./ProductModal";
 import { ProductModal } from "./ProductModal";
 import { FilterBar } from "./FilterBar";
@@ -9,10 +15,10 @@ import { ProgressiveImage } from "./ProgressiveImage";
 
 interface LiveCatalogProps {
   category: ProductCategory;
+  pageKey: CataloguePageKey;
 }
 
 const supabase = createClient();
-const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
 
 interface CatalogItem {
   id: string;
@@ -23,22 +29,23 @@ interface CatalogItem {
   description?: string;
   dimensions?: string;
   badge?: string;
-  badgeTone?: string;
+  badgeTone?: Product["badgeTone"];
   isCustomizable: boolean;
   features: string[];
   colorwaysCount?: number;
   ctaLabel?: string;
   isFeatured: boolean;
-  colorOptions: TableOption[];
-  sizeOptions: TableOption[];
   tagNames: string[];
 }
 
-export function LiveCatalog({ category }: LiveCatalogProps) {
+export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<{ category: ProductCategory; tag: string | null }>({
+    category,
+    tag: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -46,50 +53,16 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
     async function fetchItems(showLoader = true) {
       if (showLoader) setLoading(true);
 
-      // Fetch products, Color/Size options, and tag assignments in parallel
-      const [{ data: productData }, { data: optionData }, { data: tagAssignmentData }] = await Promise.all([
-        supabase
-          .from("products")
-          .select("*")
-          .eq("category", category)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("table_options")
-          .select("*")
-          .in("option_group", ["Color", "Size"])
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("product_tag_assignments")
-          .select("product_id, tags(name)")
+      const [productData, tagAssignmentData] = await Promise.all([
+        getCatalogueProducts(),
+        getProductTags(),
       ]);
 
-      if (productData && isMounted) {
-        // Group options by product_id
-        const optionsByProduct = new Map<string, { color: TableOption[]; size: TableOption[] }>();
-        for (const opt of optionData ?? []) {
-          if (!optionsByProduct.has(opt.product_id)) {
-            optionsByProduct.set(opt.product_id, { color: [], size: [] });
-          }
-          const mapped: TableOption = {
-            id: opt.id,
-            name: opt.name,
-            priceModifier: Number(opt.price_modifier ?? 0),
-            layerUrl: opt.layer_url ?? "",
-            available: opt.available ?? true,
-            incompatibleWith: [],
-          };
-          if (opt.option_group === "Color") {
-            optionsByProduct.get(opt.product_id)!.color.push(mapped);
-          } else if (opt.option_group === "Size") {
-            optionsByProduct.get(opt.product_id)!.size.push(mapped);
-          }
-        }
-
-        // Group tag names by product_id
+      if (isMounted) {
         const tagsByProduct = new Map<string, string[]>();
-        for (const assignment of tagAssignmentData ?? []) {
+        for (const assignment of tagAssignmentData) {
           const productId = assignment.product_id;
-          const tagName = (assignment as any).tags?.name;
+          const tagName = assignment.tag_name;
           if (!tagName) continue;
           if (!tagsByProduct.has(productId)) {
             tagsByProduct.set(productId, []);
@@ -97,25 +70,23 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           tagsByProduct.get(productId)!.push(tagName);
         }
 
-        const fetched: CatalogItem[] = productData.map((d: any) => ({
+        const fetched: CatalogItem[] = productData
+          .filter((d) => isVisibleOnPage(d, pageKey))
+          .map((d) => ({
           id: d.id,
           name: d.name,
-          category: d.category as ProductCategory,
-          basePrice: d.base_price,
+          category: d.category,
+          basePrice: d.basePrice,
           image: d.image,
           description: d.description,
           dimensions: d.dimensions,
           badge: d.badge,
-          badgeTone: d.badge_tone,
-          isCustomizable: d.is_customizable ?? false,
-          features: Array.isArray(d.features)
-            ? d.features.filter((f: string) => f !== HOMEPAGE_FEATURE_MARKER)
-            : [],
-          colorwaysCount: d.colorways_count,
-          ctaLabel: d.cta_label,
-          isFeatured: d.is_featured ?? false,
-          colorOptions: optionsByProduct.get(d.id)?.color ?? [],
-          sizeOptions: optionsByProduct.get(d.id)?.size ?? [],
+          badgeTone: d.badgeTone,
+          isCustomizable: d.isCustomizable,
+          features: d.features ?? [],
+          colorwaysCount: d.colorwaysCount,
+          ctaLabel: d.ctaLabel,
+          isFeatured: false,
           tagNames: tagsByProduct.get(d.id) ?? [],
         }));
 
@@ -132,7 +103,17 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
       .channel(`live-catalog-${category}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "products", filter: `category=eq.${category}` },
+        { event: "*", schema: "public", table: "Product" },
+        () => {
+          clearTimeout(fetchTimeout);
+          fetchTimeout = setTimeout(() => {
+            void fetchItems(false);
+          }, 800);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ProductImage" },
         () => {
           clearTimeout(fetchTimeout);
           fetchTimeout = setTimeout(() => {
@@ -167,12 +148,9 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
       clearTimeout(fetchTimeout);
       void supabase.removeChannel(channel);
     };
-  }, [category]);
+  }, [category, pageKey]);
 
-  // Reset tag filter when category changes
-  useEffect(() => {
-    setActiveTag(null);
-  }, [category]);
+  const activeTag = tagFilter.category === category ? tagFilter.tag : null;
 
   const openModal = useCallback((item: CatalogItem) => {
     setModalData({
@@ -185,15 +163,15 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
         description: item.description,
         dimensions: item.dimensions,
         badge: item.badge,
-        badgeTone: item.badgeTone as any,
+        badgeTone: item.badgeTone,
         isCustomizable: item.isCustomizable,
         features: item.features,
         colorwaysCount: item.colorwaysCount,
         ctaLabel: item.ctaLabel,
       },
       variations: {
-        colorOptions: item.colorOptions,
-        sizeOptions: item.sizeOptions,
+        colorOptions: [],
+        sizeOptions: [],
       },
     });
   }, []);
@@ -295,37 +273,6 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
     }
   }
 
-  // Variation indicator dots
-  const VariationBadge = ({ item }: { item: CatalogItem }) => {
-    const hasVariations = item.colorOptions.length > 0 || item.sizeOptions.length > 0;
-    if (!hasVariations) return null;
-    return (
-      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 backdrop-blur-sm shadow-sm">
-        {item.colorOptions.length > 0 && (
-          <div className="flex items-center gap-0.5">
-            {item.colorOptions.slice(0, 3).map((c) => (
-              <div key={c.id} className="h-3 w-3 rounded-full border border-white/60 overflow-hidden">
-                {c.layerUrl ? (
-                  <img src={c.layerUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full bg-[var(--text-mid)]" />
-                )}
-              </div>
-            ))}
-            {item.colorOptions.length > 3 && (
-              <span className="text-[8px] font-bold text-[var(--text-mid)]">+{item.colorOptions.length - 3}</span>
-            )}
-          </div>
-        )}
-        {item.sizeOptions.length > 0 && (
-          <span className="text-[8px] font-bold text-[var(--text-mid)]">
-            {item.sizeOptions.length} sizes
-          </span>
-        )}
-      </div>
-    );
-  };
-
   // Tag pills shown on product cards
   const TagPills = ({ item }: { item: CatalogItem }) => {
     if (item.tagNames.length === 0) return null;
@@ -351,7 +298,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           <FilterBar
             labels={availableTags}
             activeLabel={activeTag}
-            onFilterChange={setActiveTag}
+            onFilterChange={(tag) => setTagFilter({ category, tag })}
           />
         </div>
       )}
@@ -364,7 +311,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           </p>
           <button
             type="button"
-            onClick={() => setActiveTag(null)}
+            onClick={() => setTagFilter({ category, tag: null })}
             className="mt-4 text-link"
           >
             Clear filter →
@@ -403,7 +350,6 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                             {featured.badge}
                           </div>
                         )}
-                        <VariationBadge item={featured} />
                       </div>
                       <div className="mt-5">
                         <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-mid)]">
@@ -476,7 +422,6 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                             {secondary.badge}
                           </div>
                         )}
-                        <VariationBadge item={secondary} />
                       </div>
                       <div className="mt-4 flex items-start justify-between gap-3">
                         <h4 className="text-[16px] font-semibold text-[#2C2218]">
@@ -527,7 +472,6 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
                             {gridItem.badge}
                           </div>
                         )}
-                        <VariationBadge item={gridItem} />
                       </div>
                       <div className="mt-4 flex items-start justify-between gap-3">
                         <h4 className="text-[16px] font-semibold text-[#2C2218]">

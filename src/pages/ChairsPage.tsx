@@ -32,7 +32,7 @@ export function ChairsPage() {
 
       <RuleMotif />
 
-      <LiveCatalog category="Chairs" />
+      <LiveCatalog category="Chairs" pageKey="chairs" />
     </>
   );
 }

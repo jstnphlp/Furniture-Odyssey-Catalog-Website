@@ -65,7 +65,7 @@ export function TablesPage() {
           </h2>
         </div>
 
-        <LiveCatalog category="Tables" />
+        <LiveCatalog category="Tables" pageKey="tables" />
       </section>
 
       <RuleMotif />
