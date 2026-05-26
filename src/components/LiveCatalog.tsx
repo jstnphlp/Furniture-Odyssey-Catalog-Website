@@ -6,7 +6,7 @@ import {
   isVisibleOnPage,
   type CataloguePageKey,
 } from "../lib/catalogue-data";
-import type { Product, ProductCategory } from "../types/catalog";
+import type { Product, ProductCategory, ProductColorVariant, ProductImage } from "../types/catalog";
 import type { ProductModalData } from "./ProductModal";
 import { ProductModal } from "./ProductModal";
 import { FilterBar } from "./FilterBar";
@@ -26,6 +26,8 @@ interface CatalogItem {
   category: ProductCategory;
   basePrice: number;
   image: string;
+  images: ProductImage[];
+  colorVariants: ProductColorVariant[];
   description?: string;
   dimensions?: string;
   badge?: string;
@@ -78,6 +80,8 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
           category: d.category,
           basePrice: d.basePrice,
           image: d.image,
+          images: d.images ?? [],
+          colorVariants: d.colorVariants ?? [],
           description: d.description,
           dimensions: d.dimensions,
           badge: d.badge,
@@ -160,6 +164,8 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
         category: item.category,
         basePrice: item.basePrice,
         image: item.image,
+        images: item.images,
+        colorVariants: item.colorVariants,
         description: item.description,
         dimensions: item.dimensions,
         badge: item.badge,
@@ -170,7 +176,18 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
         ctaLabel: item.ctaLabel,
       },
       variations: {
-        colorOptions: [],
+        colorOptions: (item.colorVariants ?? []).map((variant) => {
+          const previewImage =
+            item.images?.find((image) => image.colorVariantId === variant.id)?.secureUrl ?? "";
+
+          return {
+            id: variant.id,
+            name: variant.name,
+            priceModifier: 0,
+            layerUrl: previewImage,
+            hex: variant.hex,
+          };
+        }),
         sizeOptions: [],
       },
     });
@@ -338,12 +355,13 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
                     onClick={() => openModal(featured)}
                   >
                     <div>
-                      <div className="relative overflow-hidden rounded-[14px] pt-[56.25%]">
+                      <div className="relative overflow-hidden rounded-[14px] bg-[var(--bg-cream)] pt-[56.25%]">
                         <ProgressiveImage
                           src={featured.image}
                           alt={featured.name}
-                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="absolute inset-0 h-full w-full object-contain object-center transition-transform duration-500 group-hover:scale-105"
                           loading="eager"
+                          fit="contain"
                         />
                         {featured.badge && (
                           <div className="absolute left-4 top-4 rounded-full bg-[#008784] px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm">
@@ -410,12 +428,13 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
                     onClick={() => openModal(secondary)}
                   >
                     <div>
-                      <div className="relative overflow-hidden rounded-[14px] pt-[75%]">
+                      <div className="relative overflow-hidden rounded-[14px] bg-[var(--bg-cream)] pt-[75%]">
                         <ProgressiveImage
                           src={secondary.image}
                           alt={secondary.name}
-                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="absolute inset-0 h-full w-full object-contain object-center transition-transform duration-500 group-hover:scale-105"
                           loading="eager"
+                          fit="contain"
                         />
                         {secondary.badge && (
                           <div className="absolute left-3 top-3 rounded-full bg-[#008784] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm">
@@ -461,11 +480,12 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
                     onClick={() => openModal(gridItem)}
                   >
                     <div>
-                      <div className="relative overflow-hidden rounded-[14px] pt-[100%]">
+                      <div className="relative overflow-hidden rounded-[14px] bg-[var(--bg-cream)] pt-[100%]">
                         <ProgressiveImage
                           src={gridItem.image}
                           alt={gridItem.name}
-                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="absolute inset-0 h-full w-full object-contain object-center transition-transform duration-500 group-hover:scale-105"
+                          fit="contain"
                         />
                         {gridItem.badge && (
                           <div className="absolute left-3 top-3 rounded-full bg-[#008784] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm">

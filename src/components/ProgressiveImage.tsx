@@ -1,10 +1,13 @@
 import { useState, useCallback } from "react";
 
+type ImageFit = "cover" | "contain";
+
 interface ProgressiveImageProps {
   src: string;
   alt: string;
   className?: string;
   loading?: "lazy" | "eager";
+  fit?: ImageFit;
 }
 
 /**
@@ -19,10 +22,14 @@ export function ProgressiveImage({
   alt,
   className = "",
   loading = "lazy",
+  fit,
 }: ProgressiveImageProps) {
   const [loaded, setLoaded] = useState(false);
 
   const handleLoad = useCallback(() => setLoaded(true), []);
+  const fitStyle = fit
+    ? { objectFit: fit, objectPosition: "center" }
+    : undefined;
 
   return (
     <img
@@ -32,7 +39,7 @@ export function ProgressiveImage({
       decoding="async"
       onLoad={handleLoad}
       className={`${className} ${loaded ? "" : "skeleton-shimmer"}`}
-      style={loaded ? undefined : { objectFit: undefined }}
+      style={fitStyle}
     />
   );
 }

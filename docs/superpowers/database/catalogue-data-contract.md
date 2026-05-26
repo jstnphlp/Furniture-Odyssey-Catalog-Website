@@ -89,6 +89,7 @@ Safe public fields:
 
 - `id`
 - `productId`
+- `colorVariantId`
 - `secureUrl`
 - `altText`
 - `sortOrder`
@@ -96,9 +97,44 @@ Safe public fields:
 
 Rules:
 
+- Images with no `colorVariantId` are general product images.
+- Images with a `colorVariantId` belong to that color variation.
 - Use the primary image first.
 - Fallback to the lowest `sortOrder` image.
 - If no image exists, catalogue should use its existing placeholder.
+
+### Product Color Variants
+
+Canonical admin model: `ProductColorVariant`
+
+Safe public fields:
+
+- `id`
+- `productId`
+- `name`
+- `hex`
+- `sortOrder`
+- `isActive`
+
+Public read view aliases:
+
+- `product_id`
+- `sort_order`
+- `is_active`
+
+Rules:
+
+- Only active variants should be exposed.
+- Use `sort_order` for display ordering.
+- Use variant images from `public_catalog_product_images.color_variant_id` when available.
+- If a selected variant has no images, catalogue should fall back to general product images.
+
+Do not expose:
+
+- Internal notes
+- Audit fields
+- Admin-only fields
+- Inactive variants
 
 ### Page Content
 
@@ -163,6 +199,7 @@ Recommended functions:
 
 - `getCatalogueProducts()` - read visible, active products and their primary image fields.
 - `getCatalogueProductImages()` - read public product images for visible, active products.
+- `getCatalogueProductColorVariants()` - read active public color variants for visible, active products.
 - `getPageContent(page: string)` - read page content rows for one page and map them by section and field key.
 - `getTags()` - read tag IDs and names for filter controls.
 - `getProductTagAssignments()` - read product-to-tag assignments for visible, active products.

@@ -45,6 +45,7 @@ CREATE OR REPLACE VIEW public.public_catalog_product_images AS
 SELECT
   pi."id",
   pi."productId" AS product_id,
+  pi."colorVariantId" AS color_variant_id,
   pi."secureUrl" AS secure_url,
   pi."altText" AS alt_text,
   pi."sortOrder" AS sort_order,
@@ -53,6 +54,20 @@ FROM public."ProductImage" pi
 INNER JOIN public."Product" p ON p."id" = pi."productId"
 WHERE p."isWebsiteVisible" = true
   AND p."status" = 'ACTIVE';
+
+CREATE OR REPLACE VIEW public.public_catalog_product_color_variants AS
+SELECT
+  pcv."id",
+  pcv."productId" AS product_id,
+  pcv."name",
+  pcv."hex",
+  pcv."sortOrder" AS sort_order,
+  pcv."isActive" AS is_active
+FROM public."ProductColorVariant" pcv
+INNER JOIN public."Product" p ON p."id" = pcv."productId"
+WHERE p."isWebsiteVisible" = true
+  AND p."status" = 'ACTIVE'
+  AND pcv."isActive" = true;
 
 CREATE OR REPLACE VIEW public.public_catalog_page_content AS
 SELECT
@@ -84,6 +99,7 @@ WHERE p."isWebsiteVisible" = true
 
 GRANT SELECT ON public.public_catalog_products TO anon, authenticated;
 GRANT SELECT ON public.public_catalog_product_images TO anon, authenticated;
+GRANT SELECT ON public.public_catalog_product_color_variants TO anon, authenticated;
 GRANT SELECT ON public.public_catalog_page_content TO anon, authenticated;
 GRANT SELECT ON public.public_catalog_tags TO anon, authenticated;
 GRANT SELECT ON public.public_catalog_product_tags TO anon, authenticated;

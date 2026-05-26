@@ -33,11 +33,12 @@ export function MiniCard({
       id={`card-${product.id}`}
       onClick={handleClick}
     >
-      <div className="relative overflow-hidden rounded-xl">
+      <div className="relative overflow-hidden rounded-xl bg-[var(--bg-cream)]">
         <ProgressiveImage
           src={product.image}
           alt={product.name}
-          className="h-52 w-full rounded-xl object-cover transition-transform duration-500 group-hover:scale-105"
+          className="h-52 w-full rounded-xl object-contain object-center transition-transform duration-500 group-hover:scale-105"
+          fit="contain"
         />
         {displayBadge && (
           <div className="absolute left-3 top-3">
