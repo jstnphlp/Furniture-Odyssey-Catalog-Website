@@ -19,6 +19,7 @@ export interface Product {
   colorwaysCount?: number
   ctaLabel?: string
   isHomepageFeatured?: boolean
+  websitePages?: string[]
 }
 
 export interface TableOption {

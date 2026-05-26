@@ -53,11 +53,25 @@ Safe public fields:
 - `status`
 - `isWebsiteVisible`
 - `websiteSortOrder`
+- `websitePages`
+
+Public read view aliases:
+
+- `website_sort_order`
+- `website_pages`
+
+Valid `websitePages` / `website_pages` page keys:
+
+- `home`
+- `chairs`
+- `tables`
+- `collections`
 
 Catalogue filter rule:
 
 - Only show products where `isWebsiteVisible = true`.
 - Only show products where `status = ACTIVE`.
+- Use `website_pages` to decide which visible products appear on Home, Chairs, Tables, and Collections.
 
 Do not expose:
 

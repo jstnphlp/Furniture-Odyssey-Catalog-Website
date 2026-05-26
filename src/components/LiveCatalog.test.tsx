@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImgHTMLAttributes } from "react";
 
 interface QueryMock<TData = unknown[]> extends PromiseLike<{ data: TData; error: null }> {
-  select: () => QueryMock<TData>;
-  eq: () => QueryMock<TData>;
-  in: () => QueryMock<TData>;
-  order: () => QueryMock<TData>;
+  select: (...args: unknown[]) => QueryMock<TData>;
+  eq: (...args: unknown[]) => QueryMock<TData>;
+  in: (...args: unknown[]) => QueryMock<TData>;
+  order: (...args: unknown[]) => QueryMock<TData>;
   catch: Promise<{ data: TData; error: null }>["catch"];
   finally: Promise<{ data: TData; error: null }>["finally"];
 }
@@ -23,13 +23,14 @@ interface CartStoreMock {
   openCart: ReturnType<typeof vi.fn>;
 }
 
-const { channelHandlers, mockSupabase } = vi.hoisted(() => {
+const { channelHandlers, mockSupabase, productRows } = vi.hoisted(() => {
   const channelHandlers: Array<{ table: string; filter?: string }> = [];
+  const productRows: unknown[] = [];
 
   const mockSupabase = {
     from: vi.fn((table: string) => {
-      if (table === "products") return makeQuery([]);
-      if (table === "product_tag_assignments") return makeQuery([]);
+      if (table === "public_catalog_products") return makeQuery(productRows);
+      if (table === "public_catalog_product_tags") return makeQuery([]);
       return makeQuery([]);
     }),
     channel: vi.fn(() => {
@@ -45,7 +46,7 @@ const { channelHandlers, mockSupabase } = vi.hoisted(() => {
     removeChannel: vi.fn(() => Promise.resolve()),
   };
 
-  return { channelHandlers, mockSupabase };
+  return { channelHandlers, mockSupabase, productRows };
 });
 
 import { LiveCatalog } from "./LiveCatalog";
@@ -91,20 +92,60 @@ vi.mock("../stores/useCartStore", () => ({
 describe("LiveCatalog realtime subscriptions", () => {
   beforeEach(() => {
     channelHandlers.length = 0;
+    productRows.length = 0;
     mockSupabase.from.mockClear();
     mockSupabase.channel.mockClear();
     mockSupabase.removeChannel.mockClear();
   });
 
-  it("subscribes to product, tag assignment, and tag changes for live refresh", async () => {
-    render(<LiveCatalog category="Chairs" />);
+  it("subscribes to product, image, tag assignment, and tag changes for live refresh", async () => {
+    render(<LiveCatalog category="Chairs" pageKey="chairs" />);
 
     await waitFor(() => {
       expect(channelHandlers).toEqual([
-        { table: "products", filter: "category=eq.Chairs" },
+        { table: "Product", filter: undefined },
+        { table: "ProductImage", filter: undefined },
         { table: "product_tag_assignments", filter: undefined },
         { table: "tags", filter: undefined },
       ]);
     });
+  });
+
+  it("shows only products assigned to the current page", async () => {
+    productRows.push(
+      {
+        id: "chair-on-chairs",
+        code: "C-1",
+        name: "Visible Chair",
+        category: "Tables",
+        description: null,
+        specifications: null,
+        reference_price: 1200,
+        currency: "PHP",
+        website_sort_order: 1,
+        website_pages: ["chairs"],
+        primary_image_url: "/visible.png",
+        primary_image_alt: null,
+      },
+      {
+        id: "chair-hidden",
+        code: "C-2",
+        name: "Hidden Chair",
+        category: "Chairs",
+        description: null,
+        specifications: null,
+        reference_price: 900,
+        currency: "PHP",
+        website_sort_order: 2,
+        website_pages: [],
+        primary_image_url: "/hidden.png",
+        primary_image_alt: null,
+      },
+    );
+
+    render(<LiveCatalog category="Chairs" pageKey="chairs" />);
+
+    expect(await screen.findByText("Visible Chair")).toBeTruthy();
+    expect(screen.queryByText("Hidden Chair")).toBeNull();
   });
 });

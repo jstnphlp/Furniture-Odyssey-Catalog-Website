@@ -1,7 +1,5 @@
 import { create } from "zustand";
-import { createClient } from "../lib/client";
-
-const supabase = createClient();
+import { getPageContent } from "../lib/catalogue-data";
 
 export interface PageContentField {
   id: string;
@@ -31,16 +29,7 @@ export const usePageContentStore = create<PageContentState>((set, get) => ({
   loadContent: async () => {
     set({ isLoading: true });
 
-    const { data, error } = await supabase
-      .from("page_content")
-      .select("*")
-      .order("page", { ascending: true });
-
-    if (error) {
-      console.error("Failed to load page content:", error.message);
-      set({ isLoading: false });
-      return;
-    }
+    const data = await getPageContent();
 
     const contentMap: Record<string, string> = {};
     for (const row of data ?? []) {

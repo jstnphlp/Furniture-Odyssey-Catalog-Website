@@ -25,6 +25,7 @@ SELECT
   p."referencePrice" AS reference_price,
   p."currency",
   p."websiteSortOrder" AS website_sort_order,
+  p."websitePages" AS website_pages,
   primary_image."secureUrl" AS primary_image_url,
   primary_image."altText" AS primary_image_alt
 FROM public."Product" p

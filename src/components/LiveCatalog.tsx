@@ -1,5 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "../lib/client";
+import {
+  getCatalogueProducts,
+  getProductTags,
+  isVisibleOnPage,
+  type CataloguePageKey,
+} from "../lib/catalogue-data";
 import type { Product, ProductCategory } from "../types/catalog";
 import type { ProductModalData } from "./ProductModal";
 import { ProductModal } from "./ProductModal";
@@ -9,10 +15,10 @@ import { ProgressiveImage } from "./ProgressiveImage";
 
 interface LiveCatalogProps {
   category: ProductCategory;
+  pageKey: CataloguePageKey;
 }
 
 const supabase = createClient();
-const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
 
 interface CatalogItem {
   id: string;
@@ -32,29 +38,7 @@ interface CatalogItem {
   tagNames: string[];
 }
 
-interface ProductRow {
-  id: string;
-  name: string;
-  category: ProductCategory;
-  base_price: number;
-  image: string;
-  description?: string;
-  dimensions?: string;
-  badge?: string;
-  badge_tone?: Product["badgeTone"];
-  is_customizable?: boolean;
-  features?: unknown;
-  colorways_count?: number;
-  cta_label?: string;
-  is_featured?: boolean;
-}
-
-interface ProductTagAssignmentRow {
-  product_id: string;
-  tags?: { name?: string } | null;
-}
-
-export function LiveCatalog({ category }: LiveCatalogProps) {
+export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
@@ -69,22 +53,16 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
     async function fetchItems(showLoader = true) {
       if (showLoader) setLoading(true);
 
-      const [{ data: productData }, { data: tagAssignmentData }] = await Promise.all([
-        supabase
-          .from("products")
-          .select("*")
-          .eq("category", category)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("product_tag_assignments")
-          .select("product_id, tags(name)")
+      const [productData, tagAssignmentData] = await Promise.all([
+        getCatalogueProducts(),
+        getProductTags(),
       ]);
 
-      if (productData && isMounted) {
+      if (isMounted) {
         const tagsByProduct = new Map<string, string[]>();
-        for (const assignment of (tagAssignmentData ?? []) as ProductTagAssignmentRow[]) {
+        for (const assignment of tagAssignmentData) {
           const productId = assignment.product_id;
-          const tagName = assignment.tags?.name;
+          const tagName = assignment.tag_name;
           if (!tagName) continue;
           if (!tagsByProduct.has(productId)) {
             tagsByProduct.set(productId, []);
@@ -92,23 +70,23 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
           tagsByProduct.get(productId)!.push(tagName);
         }
 
-        const fetched: CatalogItem[] = ((productData ?? []) as ProductRow[]).map((d) => ({
+        const fetched: CatalogItem[] = productData
+          .filter((d) => isVisibleOnPage(d, pageKey))
+          .map((d) => ({
           id: d.id,
           name: d.name,
-          category: d.category as ProductCategory,
-          basePrice: d.base_price,
+          category: d.category,
+          basePrice: d.basePrice,
           image: d.image,
           description: d.description,
           dimensions: d.dimensions,
           badge: d.badge,
-          badgeTone: d.badge_tone,
-          isCustomizable: d.is_customizable ?? false,
-          features: Array.isArray(d.features)
-            ? d.features.filter((f: string) => f !== HOMEPAGE_FEATURE_MARKER)
-            : [],
-          colorwaysCount: d.colorways_count,
-          ctaLabel: d.cta_label,
-          isFeatured: d.is_featured ?? false,
+          badgeTone: d.badgeTone,
+          isCustomizable: d.isCustomizable,
+          features: d.features ?? [],
+          colorwaysCount: d.colorwaysCount,
+          ctaLabel: d.ctaLabel,
+          isFeatured: false,
           tagNames: tagsByProduct.get(d.id) ?? [],
         }));
 
@@ -125,7 +103,17 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
       .channel(`live-catalog-${category}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "products", filter: `category=eq.${category}` },
+        { event: "*", schema: "public", table: "Product" },
+        () => {
+          clearTimeout(fetchTimeout);
+          fetchTimeout = setTimeout(() => {
+            void fetchItems(false);
+          }, 800);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ProductImage" },
         () => {
           clearTimeout(fetchTimeout);
           fetchTimeout = setTimeout(() => {
@@ -160,7 +148,7 @@ export function LiveCatalog({ category }: LiveCatalogProps) {
       clearTimeout(fetchTimeout);
       void supabase.removeChannel(channel);
     };
-  }, [category]);
+  }, [category, pageKey]);
 
   const activeTag = tagFilter.category === category ? tagFilter.tag : null;
 

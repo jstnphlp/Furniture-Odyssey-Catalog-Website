@@ -50,6 +50,7 @@ describe('App layout', () => {
     vi.useFakeTimers()
     window.scrollTo = vi.fn()
     isLoading = false
+    window.history.replaceState(null, '', '/')
   })
 
   afterEach(() => {
@@ -66,6 +67,25 @@ describe('App layout', () => {
     expect(main?.className).toContain('pb-32')
     expect(main?.className).toContain('md:pb-12')
     expect(screen.getByText('home page')).toBeTruthy()
+  })
+
+  it('opens the page that matches the current path on refresh', () => {
+    window.history.replaceState(null, '', '/tables')
+
+    render(<App />)
+
+    expect(screen.getByText('tables page')).toBeTruthy()
+  })
+
+  it('updates the page when browser history changes', () => {
+    render(<App />)
+
+    window.history.pushState(null, '', '/collections')
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(screen.getByText('collections page')).toBeTruthy()
   })
 
   it('shows the joinery table loader without loading text while app content is loading', () => {
