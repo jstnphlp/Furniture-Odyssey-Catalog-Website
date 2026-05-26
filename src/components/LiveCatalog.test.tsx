@@ -2,6 +2,26 @@
 
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ImgHTMLAttributes } from "react";
+
+interface QueryMock<TData = unknown[]> extends PromiseLike<{ data: TData; error: null }> {
+  select: () => QueryMock<TData>;
+  eq: () => QueryMock<TData>;
+  in: () => QueryMock<TData>;
+  order: () => QueryMock<TData>;
+  catch: Promise<{ data: TData; error: null }>["catch"];
+  finally: Promise<{ data: TData; error: null }>["finally"];
+}
+
+interface ChannelMock {
+  on: (event: string, config: { table: string; filter?: string }, callback: () => void) => ChannelMock;
+  subscribe: () => ChannelMock;
+}
+
+interface CartStoreMock {
+  addItem: ReturnType<typeof vi.fn>;
+  openCart: ReturnType<typeof vi.fn>;
+}
 
 const { channelHandlers, mockSupabase } = vi.hoisted(() => {
   const channelHandlers: Array<{ table: string; filter?: string }> = [];
@@ -9,12 +29,11 @@ const { channelHandlers, mockSupabase } = vi.hoisted(() => {
   const mockSupabase = {
     from: vi.fn((table: string) => {
       if (table === "products") return makeQuery([]);
-      if (table === "table_options") return makeQuery([]);
       if (table === "product_tag_assignments") return makeQuery([]);
       return makeQuery([]);
     }),
     channel: vi.fn(() => {
-      const channel: any = {
+      const channel: ChannelMock = {
         on: vi.fn((_event: string, config: { table: string; filter?: string }) => {
           channelHandlers.push({ table: config.table, filter: config.filter });
           return channel;
@@ -31,9 +50,9 @@ const { channelHandlers, mockSupabase } = vi.hoisted(() => {
 
 import { LiveCatalog } from "./LiveCatalog";
 
-function makeQuery(data: any[] = []) {
+function makeQuery<TData = unknown[]>(data: TData): QueryMock<TData> {
   const promise = Promise.resolve({ data, error: null });
-  const query: any = {
+  const query = {
     select: () => query,
     eq: () => query,
     in: () => query,
@@ -41,7 +60,7 @@ function makeQuery(data: any[] = []) {
     then: promise.then.bind(promise),
     catch: promise.catch.bind(promise),
     finally: promise.finally.bind(promise),
-  };
+  } as QueryMock<TData>;
   return query;
 }
 
@@ -58,11 +77,11 @@ vi.mock("./FilterBar", () => ({
 }));
 
 vi.mock("./ProgressiveImage", () => ({
-  ProgressiveImage: (props: any) => <img {...props} />,
+  ProgressiveImage: (props: ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
 }));
 
 vi.mock("../stores/useCartStore", () => ({
-  useCartStore: (selector: any) =>
+  useCartStore: (selector: (state: CartStoreMock) => unknown) =>
     selector({
       addItem: vi.fn(),
       openCart: vi.fn(),

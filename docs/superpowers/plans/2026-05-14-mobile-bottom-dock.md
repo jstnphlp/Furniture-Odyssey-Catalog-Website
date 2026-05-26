@@ -4,7 +4,7 @@
 
 **Goal:** Replace the mobile hamburger menu with a fixed bottom dock for page navigation while keeping the top header cart and brand behavior intact.
 
-**Architecture:** Keep desktop navigation unchanged inside `SiteNav`, but replace the mobile-only menu state and dropdown with a metadata-driven bottom dock rendered from the same page model. Update `App` layout spacing to reserve space for the fixed dock on mobile, and cover the behavior with component tests that assert mobile nav items, authenticated admin expansion, and the absence of the hamburger menu.
+**Architecture:** Keep desktop navigation unchanged inside `SiteNav`, but replace the mobile-only menu state and dropdown with a metadata-driven bottom dock rendered from the same page model. Update `App` layout spacing to reserve space for the fixed dock on mobile, and cover the behavior with component tests that assert mobile nav items and the absence of the hamburger menu.
 
 **Tech Stack:** React 19, TypeScript, Tailwind utility classes, Zustand, Vitest, Testing Library, `lucide-react`
 
@@ -19,7 +19,7 @@
 - Modify: `src/App.tsx`
   - Add mobile-safe bottom spacing so content/footer stay above the dock
 - Create: `src/components/SiteNav.test.tsx`
-  - Verify mobile dock rendering and auth-dependent admin item
+  - Verify mobile dock rendering
 - Modify: `package.json`
   - No changes expected
 
@@ -37,7 +37,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SiteNav } from './SiteNav'
-import { useAdminStore } from '../stores/useAdminStore'
 import { useCartStore } from '../stores/useCartStore'
 
 vi.mock('../stores/useCartStore', () => ({
@@ -48,12 +47,6 @@ describe('SiteNav mobile dock', () => {
   const useCartStoreMock = vi.mocked(useCartStore)
 
   beforeEach(() => {
-    useAdminStore.setState({
-      isAuthenticated: false,
-      adminEmail: null,
-      showLoginModal: false,
-      loginError: null,
-    })
     useCartStoreMock.mockImplementation((selector: any) =>
       selector({
         items: [{ quantity: 2 }],
@@ -71,19 +64,6 @@ describe('SiteNav mobile dock', () => {
     expect(screen.getByRole('button', { name: /chairs/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /tables/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /collections/i })).toBeInTheDocument()
-  })
-
-  it('adds admin to the mobile dock when authenticated', () => {
-    useAdminStore.setState({
-      isAuthenticated: true,
-      adminEmail: 'admin@example.com',
-      showLoginModal: false,
-      loginError: null,
-    })
-
-    render(<SiteNav currentPage="Home" onNavigate={vi.fn()} />)
-
-    expect(screen.getByRole('button', { name: /admin/i })).toBeInTheDocument()
   })
 
   it('navigates when a dock item is tapped', () => {
@@ -114,16 +94,12 @@ const baseNavItems = [
   { page: 'Collections', label: 'Collections', Icon: LayoutGrid },
 ] as const
 
-const mobileNavItems = isAuthenticated
-  ? [...baseNavItems, { page: 'Admin', label: 'Admin', Icon: Shield }]
-  : baseNavItems
-
 <nav
   aria-label="Mobile bottom navigation"
   className="fixed inset-x-4 bottom-4 z-40 md:hidden"
 >
   <div className="grid grid-cols-4 rounded-[28px] border border-[var(--border-warm)] bg-[#fff9f0e8] p-2 shadow-[0_18px_40px_rgba(44,34,24,0.18)] backdrop-blur-xl">
-    {mobileNavItems.map(({ page, label, Icon }) => (
+    {baseNavItems.map(({ page, label, Icon }) => (
       <button key={page} type="button" onClick={() => onNavigate(page)}>
         <Icon />
         <span>{label}</span>
@@ -187,7 +163,6 @@ git commit -m "feat: reserve mobile space for bottom dock"
 
 - Spec coverage:
   - Bottom mobile dock: Task 1
-  - Authenticated admin expansion: Task 1
   - No hamburger menu on mobile: Task 1
   - Top header cart unchanged: Task 1
   - Content/footer spacing above dock: Task 2

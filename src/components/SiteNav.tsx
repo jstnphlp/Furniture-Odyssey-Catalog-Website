@@ -1,13 +1,12 @@
 import { useRef, useCallback } from 'react'
 import type { JSX, SVGProps } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Armchair, House, LayoutGrid, Shield } from 'lucide-react'
-import { useAdminStore } from '../stores/useAdminStore'
+import { Armchair, House, LayoutGrid } from 'lucide-react'
 import { useCartStore } from '../stores/useCartStore'
 
-type PageKey = 'Home' | 'Chairs' | 'Tables' | 'Collections' | 'Admin'
+type PageKey = 'Home' | 'Chairs' | 'Tables' | 'Collections'
 
-const navItems: Exclude<PageKey, 'Admin'>[] = ['Home', 'Chairs', 'Tables', 'Collections']
+const navItems: PageKey[] = ['Home', 'Chairs', 'Tables', 'Collections']
 
 interface SiteNavProps {
   currentPage: PageKey
@@ -47,8 +46,6 @@ export function SiteNav({
   onNavigate,
   brandName = 'Furniture Odyssey',
 }: SiteNavProps) {
-  const isAuthenticated = useAdminStore((s) => s.isAuthenticated)
-  const openLogin = useAdminStore((s) => s.openLogin)
   const cartTotalItems = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
   const openCart = useCartStore((s) => s.openCart)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -57,13 +54,9 @@ export function SiteNav({
 
   const handlePointerDown = useCallback(() => {
     timerRef.current = setTimeout(() => {
-      if (isAuthenticated) {
-        onNavigate('Admin')
-      } else {
-        openLogin()
-      }
+      onNavigate('Home')
     }, 5000)
-  }, [isAuthenticated, onNavigate, openLogin])
+  }, [onNavigate])
 
   const handlePointerUp = useCallback(() => {
     if (timerRef.current) {
@@ -76,11 +69,7 @@ export function SiteNav({
     onNavigate('Home')
   }, [onNavigate])
 
-  const mobileNavItems = isAuthenticated
-    ? [...baseMobileNavItems, { page: 'Admin', label: 'Admin', Icon: Shield }]
-    : baseMobileNavItems
-
-  const mobileDockGridClass = mobileNavItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
+  const mobileNavItems = baseMobileNavItems
 
   return (
     <>
@@ -125,18 +114,6 @@ export function SiteNav({
                 </button>
               )
             })}
-            {isAuthenticated && (
-              <button
-                type="button"
-                onClick={() => onNavigate('Admin')}
-                className={`text-[13px] font-semibold tracking-wide transition ${currentPage === 'Admin'
-                  ? 'text-[#b97f50] underline decoration-[#b97f50] decoration-2 underline-offset-[10px]'
-                  : 'text-[#b97f50] opacity-60 hover:opacity-100'
-                  }`}
-              >
-                Admin
-              </button>
-            )}
           </nav>
 
           <div className="flex items-center gap-2">
@@ -172,7 +149,7 @@ export function SiteNav({
         aria-label="Mobile bottom navigation"
       >
         <div
-          className={`grid ${mobileDockGridClass} rounded-[28px] border border-[var(--border-warm)] bg-[#fff9f0e8] p-2 shadow-[0_18px_40px_rgba(44,34,24,0.18)] backdrop-blur-xl`}
+          className="grid grid-cols-4 rounded-[28px] border border-[var(--border-warm)] bg-[#fff9f0e8] p-2 shadow-[0_18px_40px_rgba(44,34,24,0.18)] backdrop-blur-xl"
         >
           {mobileNavItems.map(({ page, label, Icon }) => {
             const isActive = currentPage === page

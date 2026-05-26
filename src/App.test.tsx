@@ -12,10 +12,6 @@ vi.mock('./components/SiteFooter', () => ({
   SiteFooter: () => <div>footer</div>,
 }))
 
-vi.mock('./components/AdminLoginModal', () => ({
-  AdminLoginModal: () => null,
-}))
-
 vi.mock('./components/CartDrawer', () => ({
   CartDrawer: () => null,
 }))
@@ -36,19 +32,8 @@ vi.mock('./pages/CollectionsPage', () => ({
   CollectionsPage: () => <div>collections page</div>,
 }))
 
-vi.mock('./pages/AdminPage', () => ({
-  AdminPage: () => <div>admin page</div>,
-}))
-
 const loadContent = vi.fn()
 let isLoading = false
-
-vi.mock('./stores/useAdminStore', () => ({
-  useAdminStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({
-      isAuthenticated: false,
-    }),
-}))
 
 vi.mock('./stores/usePageContentStore', () => ({
   usePageContentStore: (

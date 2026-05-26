@@ -33,6 +33,6 @@
 **Files:**
 - Test: `src/App.test.tsx`
 
-- [ ] **Step 1: Run `npm test -- src/App.test.tsx src/components/SiteNav.test.tsx src/components/LiveCatalog.test.tsx src/types/catalog.test.ts src/stores/useCatalogStore.test.ts src/stores/useAdminStore.test.ts src/lib/utils.test.ts`**
+- [ ] **Step 1: Run `npm test -- src/App.test.tsx src/components/SiteNav.test.tsx src/components/LiveCatalog.test.tsx src/types/catalog.test.ts src/lib/utils.test.ts`**
 - [ ] **Step 2: Run `npx eslint src/App.tsx src/App.test.tsx src/components/LoadingJoineryTable.tsx`**
 - [ ] **Step 3: Commit**
