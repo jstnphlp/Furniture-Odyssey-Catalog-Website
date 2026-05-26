@@ -13,6 +13,14 @@ The React Compiler is enabled on this template. See [this documentation](https:/
 
 Note: This will impact Vite dev & build performances.
 
+## Local Environment
+
+Copy `.env.example` to `.env`, fill in your local Supabase URL and publishable key, and keep `.env` out of Git.
+
+```powershell
+Copy-Item .env.example .env
+```
+
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
