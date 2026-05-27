@@ -1,32 +1,43 @@
+import type { CatalogueTag } from "../types/catalog";
+
 interface FilterBarProps {
-  labels: string[];
-  activeLabel: string | null;
-  onFilterChange: (label: string | null) => void;
+  tags: CatalogueTag[];
+  selectedTagIds: string[];
+  onToggleTag: (tagId: string) => void;
+  onClearTags: () => void;
 }
 
-export function FilterBar({ labels, activeLabel, onFilterChange }: FilterBarProps) {
-  if (labels.length === 0) return null;
+export function FilterBar({ tags, selectedTagIds, onToggleTag, onClearTags }: FilterBarProps) {
+  if (tags.length === 0) return null;
+
+  const selectedTagIdSet = new Set(selectedTagIds);
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex max-w-full flex-wrap gap-2">
       {/* "All" button */}
       <button
         type="button"
-        onClick={() => onFilterChange(null)}
-        className={`pill-filter ${activeLabel === null ? "pill-filter-active" : ""}`}
+        onClick={onClearTags}
+        className={`pill-filter ${selectedTagIds.length === 0 ? "pill-filter-active" : ""}`}
       >
         All
       </button>
-      {labels.map((label) => (
-        <button
-          key={label}
-          type="button"
-          onClick={() => onFilterChange(label)}
-          className={`pill-filter ${label === activeLabel ? "pill-filter-active" : ""}`}
-        >
-          {label}
-        </button>
-      ))}
+      {tags.map((tag) => {
+        const isActive = selectedTagIdSet.has(tag.id);
+
+        return (
+          <button
+            key={tag.id}
+            type="button"
+            onClick={() => onToggleTag(tag.id)}
+            className={`pill-filter max-w-full break-words text-left leading-tight ${
+              isActive ? "pill-filter-active" : ""
+            }`}
+          >
+            {tag.name}
+          </button>
+        );
+      })}
     </div>
   );
 }

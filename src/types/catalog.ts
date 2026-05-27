@@ -22,6 +22,12 @@ export interface Product {
   ctaLabel?: string
   isHomepageFeatured?: boolean
   websitePages?: string[]
+  tags?: CatalogueTag[]
+}
+
+export interface CatalogueTag {
+  id: string
+  name: string
 }
 
 export interface ProductImage {

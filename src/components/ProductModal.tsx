@@ -31,7 +31,6 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [displayImage, setDisplayImage] = useState<string>("");
   const [displayImageProductId, setDisplayImageProductId] = useState<string | null>(null);
-  const [imageTransition, setImageTransition] = useState(false);
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(() => new Set());
 
   const product = data?.product ?? null;
@@ -68,7 +67,6 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
     if (!product) return;
     setDisplayImage("");
     setDisplayImageProductId(null);
-    setImageTransition(false);
     setCurrentImageIndex(0);
     setFailedImageIds(new Set());
     // Don't auto-select — let user choose explicitly
@@ -161,8 +159,6 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
       setCurrentImageIndex(nextIndex);
       setDisplayImage(nextImageUrl);
       setDisplayImageProductId(product?.id ?? null);
-      setImageTransition(true);
-      window.setTimeout(() => setImageTransition(false), 120);
     },
     [activeImages, currentImageIndex, imageSrc, product],
   );
@@ -364,9 +360,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                   src={imageSrc}
                   alt={currentImageAlt}
                   onError={handleImageError}
-                  className={`max-h-[400px] w-full object-contain transition-opacity duration-200 ${
-                    imageTransition ? "opacity-0 scale-[0.98]" : "opacity-100 scale-100"
-                  }`}
+                  className="max-h-[400px] w-full object-contain"
                 />
 
                 {showImageArrows && (

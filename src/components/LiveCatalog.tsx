@@ -2,11 +2,16 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "../lib/client";
 import {
   getCatalogueProducts,
-  getProductTags,
   isVisibleOnPage,
   type CataloguePageKey,
 } from "../lib/catalogue-data";
-import type { Product, ProductCategory, ProductColorVariant, ProductImage } from "../types/catalog";
+import type {
+  CatalogueTag,
+  Product,
+  ProductCategory,
+  ProductColorVariant,
+  ProductImage,
+} from "../types/catalog";
 import type { ProductModalData } from "./ProductModal";
 import { ProductModal } from "./ProductModal";
 import { FilterBar } from "./FilterBar";
@@ -37,16 +42,16 @@ interface CatalogItem {
   colorwaysCount?: number;
   ctaLabel?: string;
   isFeatured: boolean;
-  tagNames: string[];
+  tags: CatalogueTag[];
 }
 
 export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
-  const [tagFilter, setTagFilter] = useState<{ category: ProductCategory; tag: string | null }>({
+  const [tagFilter, setTagFilter] = useState<{ category: ProductCategory; tagIds: string[] }>({
     category,
-    tag: null,
+    tagIds: [],
   });
 
   useEffect(() => {
@@ -55,23 +60,9 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
     async function fetchItems(showLoader = true) {
       if (showLoader) setLoading(true);
 
-      const [productData, tagAssignmentData] = await Promise.all([
-        getCatalogueProducts(),
-        getProductTags(),
-      ]);
+      const productData = await getCatalogueProducts();
 
       if (isMounted) {
-        const tagsByProduct = new Map<string, string[]>();
-        for (const assignment of tagAssignmentData) {
-          const productId = assignment.product_id;
-          const tagName = assignment.tag_name;
-          if (!tagName) continue;
-          if (!tagsByProduct.has(productId)) {
-            tagsByProduct.set(productId, []);
-          }
-          tagsByProduct.get(productId)!.push(tagName);
-        }
-
         const fetched: CatalogItem[] = productData
           .filter((d) => isVisibleOnPage(d, pageKey))
           .map((d) => ({
@@ -91,7 +82,7 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
           colorwaysCount: d.colorwaysCount,
           ctaLabel: d.ctaLabel,
           isFeatured: false,
-          tagNames: tagsByProduct.get(d.id) ?? [],
+          tags: d.tags ?? [],
         }));
 
         setItems(fetched);
@@ -154,7 +145,10 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
     };
   }, [category, pageKey]);
 
-  const activeTag = tagFilter.category === category ? tagFilter.tag : null;
+  const requestedTagIds = useMemo(
+    () => (tagFilter.category === category ? tagFilter.tagIds : []),
+    [category, tagFilter],
+  );
 
   const openModal = useCallback((item: CatalogItem) => {
     setModalData({
@@ -210,22 +204,47 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
     openCartDrawer();
   }, [addItem, openCartDrawer]);
 
-  // Compute unique tag names for this category's products
+  const toggleTag = useCallback((tagId: string) => {
+    setTagFilter((current) => {
+      const currentTagIds = current.category === category ? current.tagIds : [];
+      const nextTagIds = currentTagIds.includes(tagId)
+        ? currentTagIds.filter((id) => id !== tagId)
+        : [...currentTagIds, tagId];
+
+      return { category, tagIds: nextTagIds };
+    });
+  }, [category]);
+
+  const clearTags = useCallback(() => {
+    setTagFilter({ category, tagIds: [] });
+  }, [category]);
+
+  // Compute unique tags for this category's visible products
   const availableTags = useMemo(() => {
-    const tagSet = new Set<string>();
+    const tagsById = new Map<string, CatalogueTag>();
     for (const item of items) {
-      for (const tag of item.tagNames) {
-        tagSet.add(tag);
+      for (const tag of item.tags) {
+        if (!tagsById.has(tag.id)) {
+          tagsById.set(tag.id, tag);
+        }
       }
     }
-    return Array.from(tagSet).sort();
+    return Array.from(tagsById.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [items]);
 
-  // Filter items by active tag
+  const activeTagIds = useMemo(() => {
+    if (requestedTagIds.length === 0) return requestedTagIds;
+    const availableTagIdSet = new Set(availableTags.map((tag) => tag.id));
+    return requestedTagIds.filter((tagId) => availableTagIdSet.has(tagId));
+  }, [availableTags, requestedTagIds]);
+
+  const selectedTagIdSet = useMemo(() => new Set(activeTagIds), [activeTagIds]);
+
+  // Filter items by selected tags using OR behavior
   const filteredItems = useMemo(() => {
-    if (!activeTag) return items;
-    return items.filter((item) => item.tagNames.includes(activeTag));
-  }, [items, activeTag]);
+    if (selectedTagIdSet.size === 0) return items;
+    return items.filter((item) => item.tags.some((tag) => selectedTagIdSet.has(tag.id)));
+  }, [items, selectedTagIdSet]);
 
   // Arrange items into layout rows
   const arranged: CatalogItem[] = [];
@@ -292,15 +311,15 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
 
   // Tag pills shown on product cards
   const TagPills = ({ item }: { item: CatalogItem }) => {
-    if (item.tagNames.length === 0) return null;
+    if (item.tags.length === 0) return null;
     return (
       <div className="mt-2 flex flex-wrap gap-1">
-        {item.tagNames.map((tag) => (
+        {item.tags.map((tag) => (
           <span
-            key={tag}
+            key={tag.id}
             className="rounded-full bg-[var(--bg-cream)] border border-[var(--border-warm)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-mid)]"
           >
-            {tag}
+            {tag.name}
           </span>
         ))}
       </div>
@@ -313,22 +332,23 @@ export function LiveCatalog({ category, pageKey }: LiveCatalogProps) {
       {availableTags.length > 0 && (
         <div className="mb-6">
           <FilterBar
-            labels={availableTags}
-            activeLabel={activeTag}
-            onFilterChange={(tag) => setTagFilter({ category, tag })}
+            tags={availableTags}
+            selectedTagIds={activeTagIds}
+            onToggleTag={toggleTag}
+            onClearTags={clearTags}
           />
         </div>
       )}
 
       {/* Empty state for filtered results */}
-      {filteredItems.length === 0 && activeTag && (
+      {filteredItems.length === 0 && activeTagIds.length > 0 && (
         <div className="py-16 text-center">
           <p className="font-display text-[20px] text-[var(--text-mid)]">
-            No products tagged "{activeTag}" in this category.
+            No products match the selected filters in this category.
           </p>
           <button
             type="button"
-            onClick={() => setTagFilter({ category, tag: null })}
+            onClick={clearTags}
             className="mt-4 text-link"
           >
             Clear filter →

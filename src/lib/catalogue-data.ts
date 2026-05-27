@@ -1,5 +1,6 @@
 import { createClient } from './client'
 import type {
+  CatalogueTag,
   Product,
   ProductCategory,
   ProductColorVariant,
@@ -45,12 +46,6 @@ export interface CataloguePageContent {
   field_key: string
   field_value: string
   updated_at: string | null
-}
-
-export interface CatalogueTag {
-  id: string
-  name: string
-  created_at: string | null
 }
 
 export interface CatalogueProductTag {
@@ -150,6 +145,7 @@ const mapCatalogueProduct = (
   row: CatalogueProductRow,
   images: ProductImage[] = [],
   colorVariants: ProductColorVariant[] = [],
+  tags: CatalogueTag[] = [],
 ): CatalogueProduct => {
   const sortedImages = sortProductImages(images)
   const primaryImage =
@@ -166,6 +162,7 @@ const mapCatalogueProduct = (
   image: imageUrl,
   images: sortedImages,
   colorVariants: sortColorVariants(colorVariants),
+  tags,
   description: row.description ?? undefined,
   dimensions: row.specifications ?? undefined,
   isCustomizable: false,
@@ -210,12 +207,14 @@ export async function getCatalogueProducts(): Promise<CatalogueProduct[]> {
   }
 
   const rows = (data ?? []) as unknown as CatalogueProductRow[]
-  const [imageRows, colorVariantRows] = await Promise.all([
+  const [imageRows, colorVariantRows, productTagRows] = await Promise.all([
     getCatalogueProductImages(),
     getCatalogueProductColorVariants(),
+    getProductTags(),
   ])
   const imagesByProductId = new Map<string, ProductImage[]>()
   const variantsByProductId = new Map<string, ProductColorVariant[]>()
+  const tagsByProductId = new Map<string, CatalogueTag[]>()
 
   for (const row of imageRows) {
     const image = mapCatalogueProductImage(row)
@@ -233,11 +232,21 @@ export async function getCatalogueProducts(): Promise<CatalogueProduct[]> {
     variantsByProductId.set(variant.productId, existing)
   }
 
+  for (const row of productTagRows) {
+    if (!row.tag_id || !row.tag_name) continue
+    const existing = tagsByProductId.get(row.product_id) ?? []
+    if (!existing.some((tag) => tag.id === row.tag_id)) {
+      existing.push({ id: row.tag_id, name: row.tag_name })
+    }
+    tagsByProductId.set(row.product_id, existing)
+  }
+
   return rows.map((row) =>
     mapCatalogueProduct(
       row,
       imagesByProductId.get(row.id) ?? [],
       variantsByProductId.get(row.id) ?? [],
+      tagsByProductId.get(row.id) ?? [],
     ),
   )
 }
@@ -318,7 +327,7 @@ export async function getPageContent(page?: string): Promise<CataloguePageConten
   return (data ?? []) as unknown as CataloguePageContent[]
 }
 
-export async function getTags(): Promise<CatalogueTag[]> {
+export async function getTags(): Promise<Array<CatalogueTag & { created_at: string | null }>> {
   const { data, error } = await supabase
     .from('public_catalog_tags')
     .select('id, name, created_at')
@@ -329,7 +338,7 @@ export async function getTags(): Promise<CatalogueTag[]> {
     return []
   }
 
-  return (data ?? []) as unknown as CatalogueTag[]
+  return (data ?? []) as unknown as Array<CatalogueTag & { created_at: string | null }>
 }
 
 export async function getProductTags(): Promise<CatalogueProductTag[]> {
