@@ -54,11 +54,13 @@ Safe public fields:
 - `isWebsiteVisible`
 - `websiteSortOrder`
 - `websitePages`
+- `websitePageSortOrders`
 
 Public read view aliases:
 
 - `website_sort_order`
 - `website_pages`
+- `website_page_sort_orders`
 
 Valid `websitePages` / `website_pages` page keys:
 
@@ -72,6 +74,7 @@ Catalogue filter rule:
 - Only show products where `isWebsiteVisible = true`.
 - Only show products where `status = ACTIVE`.
 - Use `website_pages` to decide which visible products appear on Home, Chairs, Tables, and Collections.
+- Use `website_page_sort_orders` for page-specific ordering. It is a JSON object keyed by `home`, `chairs`, `tables`, and `collections`; missing keys should be treated as `0`.
 
 Do not expose:
 
@@ -97,10 +100,11 @@ Safe public fields:
 
 Rules:
 
-- Images with no `colorVariantId` are general product images.
-- Images with a `colorVariantId` belong to that color variation.
-- Use the primary image first.
-- Fallback to the lowest `sortOrder` image.
+- Products can have multiple images.
+- Images with `colorVariantId = null` are general product images.
+- Images with `colorVariantId` set belong to that admin-managed color variation.
+- Use the primary general product image first.
+- Fallback to the lowest `sortOrder` general image, then the first available color variation image.
 - If no image exists, catalogue should use its existing placeholder.
 
 ### Product Color Variants
@@ -116,25 +120,11 @@ Safe public fields:
 - `sortOrder`
 - `isActive`
 
-Public read view aliases:
-
-- `product_id`
-- `sort_order`
-- `is_active`
-
 Rules:
 
-- Only active variants should be exposed.
-- Use `sort_order` for display ordering.
-- Use variant images from `public_catalog_product_images.color_variant_id` when available.
-- If a selected variant has no images, catalogue should fall back to general product images.
-
-Do not expose:
-
-- Internal notes
-- Audit fields
-- Admin-only fields
-- Inactive variants
+- Color variants are optional and managed in the admin dashboard.
+- Catalogue reads active variants only.
+- Use `ProductImage.colorVariantId` to group variation images.
 
 ### Page Content
 
