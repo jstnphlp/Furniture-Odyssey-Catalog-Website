@@ -120,7 +120,7 @@ export function CartDrawer() {
                   <img
                     src={item.image_url}
                     alt={item.name}
-                    className="h-[60px] w-[60px] flex-shrink-0 rounded-lg object-cover"
+                    className="h-[60px] w-[60px] flex-shrink-0 rounded-lg bg-[var(--bg-cream)] object-contain object-center"
                   />
 
                   {/* Details */}

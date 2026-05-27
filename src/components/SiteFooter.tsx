@@ -28,24 +28,29 @@ export function SiteFooter({
           </p>
         </div>
 
-        {/* Col 2: Shop */}
+        {/* Col 2: Navigation */}
         <div className="space-y-2 text-[13px] text-[var(--text-mid)]">
-          <p className="font-semibold text-[var(--text-dark)]">Shop</p>
+          <button
+            onClick={() => onNavigate('Home')}
+            className="block cursor-pointer transition hover:text-[#b97f50]"
+          >
+            Home
+          </button>
           <button
             onClick={() => onNavigate('Chairs')}
-            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+            className="block cursor-pointer transition hover:text-[#b97f50]"
           >
             Chairs
           </button>
           <button
             onClick={() => onNavigate('Tables')}
-            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+            className="block cursor-pointer transition hover:text-[#b97f50]"
           >
             Tables
           </button>
           <button
             onClick={() => onNavigate('Collections')}
-            className="block cursor-pointer transition hover:text-[var(--text-dark)]"
+            className="block cursor-pointer transition hover:text-[#b97f50]"
           >
             Collections
           </button>

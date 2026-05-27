@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "../lib/client";
-import type { Product, TableOption } from "../types/catalog";
+import {
+  getCatalogueProducts,
+  isVisibleOnPage,
+  type CatalogueProduct,
+} from "../lib/catalogue-data";
+import type { CustomizableTable, Product } from "../types/catalog";
+import type { PageKey } from "../components/SiteNav";
 import { MiniCard } from "../components/MiniCard";
 import { RuleMotif } from "../components/RuleMotif";
 import { ProductModal } from "../components/ProductModal";
@@ -9,42 +15,11 @@ import { usePageContentStore } from "../stores/usePageContentStore";
 import { ProgressiveImage } from "../components/ProgressiveImage";
 
 const supabase = createClient();
-const HOMEPAGE_FEATURE_MARKER = "__homepage_featured__";
 const MAX_HOMEPAGE_FEATURED = 4;
 
-const mapDbProduct = (row: any): Product => {
-  const rawFeatures = Array.isArray(row.features) ? row.features : [];
-  const features = rawFeatures.filter(
-    (feature: string) => feature !== HOMEPAGE_FEATURE_MARKER,
-  );
-  const featuredFromColumn =
-    Boolean(row.is_featured) || Boolean(row.is_homepage_featured);
-
-  return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    basePrice: row.base_price ?? 0,
-    image: row.image,
-    description: row.description,
-    dimensions: row.dimensions,
-    badge: row.badge,
-    badgeTone: row.badge_tone,
-    isCustomizable: row.is_customizable ?? false,
-    features,
-    colorwaysCount: row.colorways_count,
-    ctaLabel: row.cta_label,
-    isHomepageFeatured:
-      featuredFromColumn || rawFeatures.includes(HOMEPAGE_FEATURE_MARKER),
-  };
-};
-
-export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
-  const [products, setProducts] = useState<Product[]>([]);
+export function HomePage({ onNavigate }: { onNavigate?: (page: PageKey) => void }) {
+  const [products, setProducts] = useState<CatalogueProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [variationsByProduct, setVariationsByProduct] = useState<
-    Map<string, { color: TableOption[]; size: TableOption[] }>
-  >(new Map());
   const [modalData, setModalData] = useState<ProductModalData | null>(null);
 
   const getField = usePageContentStore((s) => s.getField);
@@ -55,55 +30,10 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
     const fetchProducts = async (showLoader = true) => {
       if (showLoader) setLoading(true);
 
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Failed to fetch homepage products", error);
-        if (showLoader && isMounted) setLoading(false);
-        return;
-      }
+      const data = await getCatalogueProducts();
 
       if (isMounted) {
-        const mappedProducts = (data ?? []).map(mapDbProduct);
-        setProducts(mappedProducts);
-
-        // Fetch Color/Size variations for all products
-        const productIds = mappedProducts.map((p) => p.id);
-        if (productIds.length > 0) {
-          const { data: optionData } = await supabase
-            .from("table_options")
-            .select("*")
-            .in("product_id", productIds)
-            .in("option_group", ["Color", "Size"])
-            .order("created_at", { ascending: true });
-
-          const varMap = new Map<
-            string,
-            { color: TableOption[]; size: TableOption[] }
-          >();
-          for (const opt of optionData ?? []) {
-            if (!varMap.has(opt.product_id)) {
-              varMap.set(opt.product_id, { color: [], size: [] });
-            }
-            const mapped: TableOption = {
-              id: opt.id,
-              name: opt.name,
-              priceModifier: Number(opt.price_modifier ?? 0),
-              layerUrl: opt.layer_url ?? "",
-              available: opt.available ?? true,
-              incompatibleWith: [],
-            };
-            if (opt.option_group === "Color") {
-              varMap.get(opt.product_id)!.color.push(mapped);
-            } else {
-              varMap.get(opt.product_id)!.size.push(mapped);
-            }
-          }
-          setVariationsByProduct(varMap);
-        }
+        setProducts(data);
         setLoading(false);
       }
     };
@@ -114,7 +44,14 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
       .channel("homepage-products-live")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "products" },
+        { event: "*", schema: "public", table: "Product" },
+        () => {
+          void fetchProducts(false);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ProductImage" },
         () => {
           void fetchProducts(false);
         },
@@ -136,22 +73,26 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
 
   /* Curate items for the horizontal pick row */
   const curatorPicks = useMemo(() => {
-    // Only show products explicitly marked as homepage featured
     return products
-      .filter((p) => p.isHomepageFeatured)
+      .filter((product) => isVisibleOnPage(product, "home"))
       .slice(0, MAX_HOMEPAGE_FEATURED);
   }, [products]);
+
+  const homeProducts = useMemo(
+    () => products.filter((product) => isVisibleOnPage(product, "home")),
+    [products],
+  );
 
   const heroImg1 = c(
     "hero",
     "image1",
-    products.find((p) => p.id === "home-001")?.image ??
+    homeProducts.find((p) => p.id === "home-001")?.image ??
       "/images/wooden-cabinet.png",
   );
   const heroImg2 = c(
     "hero",
     "image2",
-    products.find((p) => p.id === "chair-002")?.image ??
+    homeProducts.find((p) => p.id === "chair-002")?.image ??
       "/images/chair-sage.png",
   );
   const materialImg = c("honest_materials", "image", "/images/craftsman.png");
@@ -162,17 +103,16 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
   );
 
   const handleOpenModal = useCallback(
-    (product: Product) => {
-      const vars = variationsByProduct.get(product.id);
+    (product: Product | CustomizableTable) => {
       setModalData({
         product,
         variations: {
-          colorOptions: vars?.color ?? [],
-          sizeOptions: vars?.size ?? [],
+          colorOptions: [],
+          sizeOptions: [],
         },
       });
     },
-    [variationsByProduct],
+    [],
   );
 
   const handleCloseModal = useCallback(() => setModalData(null), []);
@@ -196,7 +136,7 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
       {/* ═══ HERO ═══════════════════════════════════ */}
       <section className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
         <div className="animate-fade-in-up">
-          <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--secondary)]">
+          <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--tertiary)]">
             {c("hero", "eyebrow", "A New Way to Sit")}
           </p>
           <h1 className="font-display text-[46px] leading-[1.06] text-[var(--text-dark)] sm:text-[60px]">
@@ -269,7 +209,7 @@ export function HomePage({ onNavigate }: { onNavigate?: (page: any) => void }) {
                 key={product.id}
                 product={product}
                 cta="Quick Shop"
-                onOpenModal={handleOpenModal as any}
+                onOpenModal={handleOpenModal}
               />
             ) : null,
           )}

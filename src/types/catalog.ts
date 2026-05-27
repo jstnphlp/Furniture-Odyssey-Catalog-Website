@@ -10,6 +10,8 @@ export interface Product {
   category: ProductCategory
   basePrice: number
   image: string
+  images: ProductImage[]
+  colorVariants: ProductColorVariant[]
   description?: string
   dimensions?: string
   badge?: string
@@ -19,6 +21,26 @@ export interface Product {
   colorwaysCount?: number
   ctaLabel?: string
   isHomepageFeatured?: boolean
+  websitePages?: string[]
+}
+
+export interface ProductImage {
+  id: string
+  productId: string
+  colorVariantId?: string | null
+  secureUrl: string
+  altText?: string | null
+  sortOrder: number
+  isPrimary: boolean
+}
+
+export interface ProductColorVariant {
+  id: string
+  productId: string
+  name: string
+  hex?: string | null
+  sortOrder: number
+  isActive: boolean
 }
 
 export interface TableOption {
@@ -26,6 +48,7 @@ export interface TableOption {
   name: string
   priceModifier: number
   layerUrl: string
+  hex?: string | null
   available?: boolean
   incompatibleWith?: string[]
 }

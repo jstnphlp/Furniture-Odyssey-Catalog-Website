@@ -1,7 +1,19 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Product, CustomizableTable, TableOption, ProductVariations } from "../types/catalog";
 import { useCartStore } from "../stores/useCartStore";
+
+const PRODUCT_IMAGE_PLACEHOLDER = "/images/wooden-cabinet.png";
+
+const hasValidImageUrl = (url?: string | null) => Boolean(url?.trim());
+
+const preloadImage = (src: string) =>
+  new Promise<void>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error(`Unable to preload image: ${src}`));
+    image.src = src;
+  });
 
 export interface ProductModalData {
   product: Product | CustomizableTable;
@@ -16,11 +28,36 @@ interface ProductModalProps {
 export function ProductModal({ data, onClose }: ProductModalProps) {
   const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
   const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [displayImage, setDisplayImage] = useState<string>("");
+  const [displayImageProductId, setDisplayImageProductId] = useState<string | null>(null);
   const [imageTransition, setImageTransition] = useState(false);
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(() => new Set());
 
   const product = data?.product ?? null;
-  const colorOptions = data?.variations.colorOptions ?? [];
+  const productImages = useMemo(() => product?.images ?? [], [product?.images]);
+  const productColorVariants = useMemo(
+    () => product?.colorVariants?.filter((variant) => variant.isActive) ?? [],
+    [product?.colorVariants],
+  );
+  const catalogueColorOptions = useMemo(
+    () =>
+      productColorVariants.map((variant) => {
+        const previewImage =
+          productImages.find((image) => image.colorVariantId === variant.id)?.secureUrl ?? "";
+
+        return {
+          id: variant.id,
+          name: variant.name,
+          priceModifier: 0,
+          layerUrl: previewImage,
+          hex: variant.hex,
+        };
+      }),
+    [productColorVariants, productImages],
+  );
+  const colorOptions =
+    data?.variations.colorOptions.length ? data.variations.colorOptions : catalogueColorOptions;
   const sizeOptions = data?.variations.sizeOptions ?? [];
 
   const hasColors = colorOptions.length > 0;
@@ -29,31 +66,171 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
   // Reset selections when product changes
   useEffect(() => {
     if (!product) return;
-    setDisplayImage(product.image);
+    setDisplayImage("");
+    setDisplayImageProductId(null);
+    setImageTransition(false);
+    setCurrentImageIndex(0);
+    setFailedImageIds(new Set());
     // Don't auto-select — let user choose explicitly
     setSelectedColorId(null);
     setSelectedSizeId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
 
+  const validImages = useMemo(
+    () =>
+      productImages.filter(
+        (image) => hasValidImageUrl(image.secureUrl) && !failedImageIds.has(image.id),
+      ),
+    [failedImageIds, productImages],
+  );
+  const generalImages = useMemo(
+    () => validImages.filter((image) => !image.colorVariantId),
+    [validImages],
+  );
+  const selectedColorImages = useMemo(
+    () =>
+      selectedColorId
+        ? validImages.filter((image) => image.colorVariantId === selectedColorId)
+        : [],
+    [selectedColorId, validImages],
+  );
+  const fallbackImageArray = useMemo(
+    () => {
+      if (!product) return [];
+
+      const fallbackUrl = hasValidImageUrl(product.image)
+        ? product.image.trim()
+        : PRODUCT_IMAGE_PLACEHOLDER;
+
+      return [
+        {
+          id: `${product.id}-fallback`,
+          productId: product.id,
+          colorVariantId: null,
+          secureUrl: fallbackUrl,
+          altText: product.name,
+          sortOrder: 0,
+          isPrimary: true,
+        },
+      ];
+    },
+    [product],
+  );
+  const activeImages =
+    selectedColorImages.length > 0
+      ? selectedColorImages
+      : generalImages.length > 0
+        ? generalImages
+        : fallbackImageArray;
+  const currentImage = activeImages[currentImageIndex] ?? activeImages[0] ?? null;
+  const currentImageUrl =
+    currentImage?.secureUrl?.trim() ||
+    (hasValidImageUrl(product?.image) ? product!.image.trim() : PRODUCT_IMAGE_PLACEHOLDER);
+  const currentImageAlt = currentImage?.altText ?? product?.name ?? "Product image";
+  const imageSrc =
+    displayImageProductId === product?.id && displayImage ? displayImage : currentImageUrl;
+  const showImageArrows = activeImages.length > 1;
+
+  useEffect(() => {
+    if (currentImageIndex < activeImages.length) return;
+    setCurrentImageIndex(0);
+  }, [activeImages.length, currentImageIndex]);
+
+  const switchToImage = useCallback(
+    async (nextIndex: number, nextImages = activeImages) => {
+      const nextImage = nextImages[nextIndex] ?? nextImages[0];
+      const nextImageUrl =
+        nextImage?.secureUrl?.trim() ||
+        (hasValidImageUrl(product?.image) ? product!.image.trim() : PRODUCT_IMAGE_PLACEHOLDER);
+
+      if (nextImageUrl === imageSrc && nextIndex === currentImageIndex) return;
+
+      try {
+        await preloadImage(nextImageUrl);
+      } catch {
+        if (nextImage && !nextImage.id.endsWith("-fallback")) {
+          setFailedImageIds((failedIds) => {
+            const nextFailedIds = new Set(failedIds);
+            nextFailedIds.add(nextImage.id);
+            return nextFailedIds;
+          });
+        }
+      }
+
+      setCurrentImageIndex(nextIndex);
+      setDisplayImage(nextImageUrl);
+      setDisplayImageProductId(product?.id ?? null);
+      setImageTransition(true);
+      window.setTimeout(() => setImageTransition(false), 120);
+    },
+    [activeImages, currentImageIndex, imageSrc, product],
+  );
+
   // Handle color selection → image switch (toggle off if already selected)
   const handleColorSelect = useCallback(
     (option: TableOption) => {
       const isDeselecting = selectedColorId === option.id;
-      setSelectedColorId(isDeselecting ? null : option.id);
-      const nextImage = isDeselecting
-        ? (product?.image || "")
-        : (option.layerUrl || product?.image || "");
-      if (nextImage !== displayImage) {
-        setImageTransition(true);
-        setTimeout(() => {
-          setDisplayImage(nextImage);
-          setImageTransition(false);
-        }, 150);
-      }
+      const nextSelectedColorId = isDeselecting ? null : option.id;
+      const nextSelectedColorImages = nextSelectedColorId
+        ? validImages.filter((image) => image.colorVariantId === nextSelectedColorId)
+        : [];
+      const nextActiveImages =
+        nextSelectedColorImages.length > 0
+          ? nextSelectedColorImages
+          : generalImages.length > 0
+            ? generalImages
+            : fallbackImageArray;
+
+      setSelectedColorId(nextSelectedColorId);
+      setCurrentImageIndex(0);
+      void switchToImage(0, nextActiveImages);
     },
-    [product?.image, displayImage, selectedColorId],
+    [fallbackImageArray, generalImages, selectedColorId, switchToImage, validImages],
   );
+
+  const goPreviousImage = useCallback(() => {
+    if (activeImages.length <= 1) return;
+    const nextIndex = currentImageIndex === 0 ? activeImages.length - 1 : currentImageIndex - 1;
+    void switchToImage(nextIndex);
+  }, [activeImages.length, currentImageIndex, switchToImage]);
+
+  const goNextImage = useCallback(() => {
+    if (activeImages.length <= 1) return;
+    const nextIndex = currentImageIndex === activeImages.length - 1 ? 0 : currentImageIndex + 1;
+    void switchToImage(nextIndex);
+  }, [activeImages.length, currentImageIndex, switchToImage]);
+
+  const handleImageError = useCallback(() => {
+    if (currentImage && currentImage.id.endsWith("-fallback")) {
+      setDisplayImage(PRODUCT_IMAGE_PLACEHOLDER);
+      setDisplayImageProductId(product?.id ?? null);
+      return;
+    }
+
+    if (currentImage) {
+      setFailedImageIds((failedIds) => {
+        const nextFailedIds = new Set(failedIds);
+        nextFailedIds.add(currentImage.id);
+        return nextFailedIds;
+      });
+    }
+
+    const remainingImageCount = activeImages.filter(
+      (image) => image.id !== currentImage?.id,
+    ).length;
+
+    if (remainingImageCount > 0) {
+      setCurrentImageIndex((current) =>
+        current >= remainingImageCount ? 0 : current,
+      );
+      return;
+    }
+
+    setCurrentImageIndex(0);
+    setDisplayImage(PRODUCT_IMAGE_PLACEHOLDER);
+    setDisplayImageProductId(product?.id ?? null);
+  }, [activeImages, currentImage, product?.id]);
 
   // Ref to persist the scroll position across effect re-fires
   const scrollYRef = useRef(0);
@@ -62,6 +239,8 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") goPreviousImage();
+      if (e.key === "ArrowRight") goNextImage();
     };
     if (data) {
       document.addEventListener("keydown", handleKeyDown);
@@ -69,7 +248,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [data, onClose]);
+  }, [data, goNextImage, goPreviousImage, onClose]);
 
   // Scroll-lock: useLayoutEffect prevents the visual flash of scrolling to top
   useLayoutEffect(() => {
@@ -143,12 +322,47 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
               {/* Main product image */}
               <div className="relative flex-1 flex items-center justify-center p-4 sm:p-8 min-h-[240px] lg:min-h-[480px]">
                 <img
-                  src={displayImage}
-                  alt={product.name}
+                  src={imageSrc}
+                  alt={currentImageAlt}
+                  onError={handleImageError}
                   className={`max-h-[400px] w-full object-contain transition-opacity duration-200 ${
                     imageTransition ? "opacity-0 scale-[0.98]" : "opacity-100 scale-100"
                   }`}
                 />
+
+                {showImageArrows && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        goPreviousImage();
+                      }}
+                      className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[var(--text-dark)] shadow-md backdrop-blur-sm transition hover:bg-white"
+                      aria-label="Previous image"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        goNextImage();
+                      }}
+                      className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[var(--text-dark)] shadow-md backdrop-blur-sm transition hover:bg-white"
+                      aria-label="Next image"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </button>
+                    <div className="absolute right-6 top-6 rounded-full bg-white/85 px-3 py-1 text-[11px] font-bold text-[var(--text-mid)] shadow-sm backdrop-blur-sm">
+                      {currentImageIndex + 1} / {activeImages.length}
+                    </div>
+                  </>
+                )}
 
                 {/* Image action icons */}
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
@@ -242,6 +456,11 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                                   src={option.layerUrl}
                                   alt={option.name}
                                   className="h-full w-full object-cover"
+                                />
+                              ) : option.hex ? (
+                                <div
+                                  className="h-full w-full"
+                                  style={{ backgroundColor: option.hex }}
                                 />
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center text-[10px] text-[var(--text-mid)]">
@@ -367,9 +586,9 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                       const addItem = useCartStore.getState().addItem;
                       const openCart = useCartStore.getState().openCart;
                       addItem({
-                        id: product.id,
-                        name: product.name,
-                        image_url: displayImage || product.image,
+                        id: selectedColor ? `${product.id}:${selectedColor.id}` : product.id,
+                        name: selectedColor ? `${product.name} - ${selectedColor.name}` : product.name,
+                        image_url: currentImageUrl || product.image,
                         price: estimatedTotal,
                         category: product.category,
                         cta_label: hasColors || hasSizes ? "Confirm Selection" : "Add to Bag",

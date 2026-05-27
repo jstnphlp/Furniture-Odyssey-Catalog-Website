@@ -86,11 +86,11 @@ export function ProductCard({ product, size = 'default' }: ProductCardProps) {
   if (!isCustomizableTable(product)) {
     return (
       <article className="warm-card group" id={`product-${product.id}`}>
-        <div className="relative overflow-hidden rounded-xl">
+        <div className="relative overflow-hidden rounded-xl bg-[var(--bg-cream)]">
           <img
             src={product.image}
             alt={product.name}
-            className={`${imgHeight} w-full rounded-xl object-cover transition-transform duration-500 group-hover:scale-105`}
+            className={`${imgHeight} w-full rounded-xl object-contain object-center transition-transform duration-500 group-hover:scale-105`}
           />
           {product.badge && (
             <div className="absolute left-3 top-3">
@@ -158,11 +158,11 @@ export function ProductCard({ product, size = 'default' }: ProductCardProps) {
       {isActive ? (
         <LayeredPreview table={product} />
       ) : (
-        <div className="relative overflow-hidden rounded-xl">
+        <div className="relative overflow-hidden rounded-xl bg-[var(--bg-cream)]">
           <img
             src={product.image}
             alt={product.name}
-            className={`${imgHeight} w-full rounded-xl object-cover transition-transform duration-500 group-hover:scale-105`}
+            className={`${imgHeight} w-full rounded-xl object-contain object-center transition-transform duration-500 group-hover:scale-105`}
           />
         </div>
       )}

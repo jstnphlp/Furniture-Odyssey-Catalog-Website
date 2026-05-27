@@ -10,6 +10,8 @@ describe('catalog > isCustomizableTable', () => {
       category: 'Tables',
       basePrice: 1000,
       image: '/image.png',
+      images: [],
+      colorVariants: [],
       isCustomizable: true,
       options: {
         Top: [],
@@ -28,6 +30,8 @@ describe('catalog > isCustomizableTable', () => {
       category: 'Chairs',
       basePrice: 100,
       image: '/image.png',
+      images: [],
+      colorVariants: [],
       isCustomizable: false
     }
 

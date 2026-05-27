@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import type { CustomizableTable } from '../types/catalog'
 import { useConfiguratorStore } from '../stores/useConfiguratorStore'
 
@@ -21,11 +20,7 @@ export function LayeredPreview({ table }: LayeredPreviewProps) {
     table.options.Base.find((option) => option.id === selectedBaseId) ??
     table.options.Base[0]
 
-  /* Crossfade effect: track previous URLs and animate opacity */
-  const [fadeKey, setFadeKey] = useState(0)
-  useEffect(() => {
-    setFadeKey((k) => k + 1)
-  }, [selectedTopId, selectedLegsId, selectedBaseId])
+  const fadeKey = [selectedTop?.id, selectedLegs?.id, selectedBase?.id].join('-')
 
   return (
     <div className="relative h-72 overflow-hidden rounded-xl border border-[#e4d5c8] bg-[#f7efe6]">

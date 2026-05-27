@@ -42,7 +42,7 @@ export function CollectionsPage() {
       <RuleMotif />
 
       <div id="collections-catalog">
-        <LiveCatalog category="Collections" />
+        <LiveCatalog category="Collections" pageKey="collections" />
       </div>
 
       <RuleMotif />
