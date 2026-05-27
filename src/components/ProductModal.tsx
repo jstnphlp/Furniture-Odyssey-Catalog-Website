@@ -280,12 +280,51 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
   const colorModifier = selectedColor?.priceModifier ?? 0;
   const sizeModifier = selectedSize?.priceModifier ?? 0;
   const estimatedTotal = product.basePrice + colorModifier + sizeModifier;
+  const formattedEstimatedTotal = estimatedTotal.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+  });
 
   // Build config summary
   const configParts: string[] = [];
   if (selectedColor) configParts.push(selectedColor.name);
   if (selectedSize) configParts.push(selectedSize.name);
   if (product.dimensions) configParts.push(product.dimensions);
+  const colorFromDimensions = product.dimensions
+    ?.match(/(?:^|\|)\s*Color\s*:\s*([^|]+)/i)?.[1]
+    ?.trim();
+  const cleanedDimensions = product.dimensions
+    ?.split("|")
+    .map((part) => part.trim())
+    .filter((part) => part && !/^Color\s*:/i.test(part))
+    .join(" | ");
+  const inquiryConfigParts = [
+    selectedSize?.name,
+    cleanedDimensions,
+  ].filter((part): part is string => Boolean(part));
+  const inquiryColorVariant = selectedColor?.name ?? colorFromDimensions ?? "Standard";
+  const inquiryConfiguration = inquiryConfigParts.length > 0
+    ? inquiryConfigParts.join(" | ")
+    : "Standard";
+
+  const handleInquireClick = () => {
+    const message = [
+      "Hi! I'd like to inquire about this item from Furniture Odyssey:",
+      "",
+      `Product: ${product.name}`,
+      `Category: ${product.category}`,
+      `Color Variant: ${inquiryColorVariant}`,
+      `Configuration: ${inquiryConfiguration}`,
+      `Estimated Price: ₱${formattedEstimatedTotal}`,
+      "",
+      "Thank you!",
+    ].join("\n");
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const base = isMobile
+      ? "https://m.me/DHomeMNL"
+      : "https://www.facebook.com/messages/t/DHomeMNL";
+    const url = `${base}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener");
+  };
 
   let sectionNumber = 1;
 
@@ -400,7 +439,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                       Estimated Total
                     </p>
                     <p className="font-display text-[28px] font-semibold text-[var(--text-dark)] leading-tight">
-                      ₱{estimatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      ₱{formattedEstimatedTotal}
                     </p>
                   </div>
                 </div>
@@ -571,7 +610,7 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                     <div className="border-t border-[var(--border-warm)] pt-1.5">
                       <div className="flex justify-between text-[14px] font-semibold text-[var(--text-dark)]">
                         <span>Total</span>
-                        <span>₱{estimatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                        <span>₱{formattedEstimatedTotal}</span>
                       </div>
                     </div>
                   </div>
@@ -602,6 +641,16 @@ export function ProductModal({ data, onClose }: ProductModalProps) {
                       <circle cx="10" cy="19" r="1.2" /><circle cx="17" cy="19" r="1.2" />
                     </svg>
                     {hasColors || hasSizes ? "Confirm Selection" : "Add to Bag"}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#C9A27F] bg-white/70 px-6 py-3.5 text-[14px] font-bold text-[#7A3F18] shadow-sm transition hover:border-[#A66A3F] hover:bg-[#FFF5E8] hover:text-[#5f2f12] active:scale-[0.98]"
+                    onClick={handleInquireClick}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                      <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.2 5.42 3.17 7.21V22l3.03-1.64c.84.23 1.74.34 2.8.34 5.64 0 10-4.13 10-9.7S17.64 2 12 2z" />
+                    </svg>
+                    Inquire about this item
                   </button>
                   <div className="flex items-center justify-center gap-6">
                     <button type="button" className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-mid)] transition hover:text-[var(--text-dark)]" onClick={() => navigator.clipboard.writeText(window.location.href).then(() => alert('Link copied to clipboard!'))}>
